@@ -50,6 +50,7 @@
 | OpenAPI、Protobuf、事件和数据边界一致 | 进行中 | 视频读取和分片上传/完成契约已定义；视频生命周期、审核与事件 Protobuf 待补齐 |
 | 分片上传完成后创建可幂等的转码任务 | 部分达成 | media-service Flyway V1、上传会话、完成操作、唯一转码任务和 `media.upload.completed.v1` Outbox 已实现并通过服务内集成测试；真实 S3 上传与 RocketMQ 投递待补齐 |
 | 转码产出 HLS、封面和字幕并回报媒体服务 | 部分达成 | Worker 已通过 Triple 领取任务，Jaffree 适配器生成 HLS VOD 清单和封面并回报 media-service；本机未安装 FFmpeg，未执行真实视频、字幕和对象存储集成测试 |
+| 公开内容读取与播放清单 | 部分达成 | video-service 提供首页内容流、详情和游标；playback-service 提供独立的公开 HLS 清单投影，用户端远程模式不再回退 Mock。审核发布事件、真实对象存储签名与跨进程联调待实现 |
 | 审核通过后发布，用户端可取得 HLS 清单 | 未开始 | 待实现跨服务事件处理与端到端测试 |
 | 管理端可以查看任务并执行受权限保护的审核操作 | 未开始 | 待实现管理 API 与前端联调 |
 

@@ -14,6 +14,22 @@ spring:
         enabled: false
     sentinel:
       eager: false
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: local-home-feed-api
+              uri: ${STREAMORA_VIDEO_SERVICE_URL:http://127.0.0.1:8084}
+              predicates:
+                - Path=/api/v1/home/feed
+            - id: local-playback-api
+              uri: ${STREAMORA_PLAYBACK_SERVICE_URL:http://127.0.0.1:8087}
+              predicates:
+                - Path=/api/v1/videos/*/playback
+            - id: local-video-api
+              uri: ${STREAMORA_VIDEO_SERVICE_URL:http://127.0.0.1:8084}
+              predicates:
+                - Path=/api/v1/videos/**
 
 server:
   port: ${SERVER_PORT:8080}

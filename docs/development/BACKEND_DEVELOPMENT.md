@@ -40,7 +40,7 @@ implementationStatus: 阶段 2 已完成；阶段 3 进行中，视频读取契�
 - 公共/个人活动宠物选择：`/api/v1/pets/active`。
 - identity 会话内部契约：Dubbo Triple + Protobuf `IdentitySessionService`。
 - identity/admin/pet 三个服务的 Flyway V1 和 H2 PostgreSQL 兼容测试。
-- 阶段 3 视频读取 OpenAPI：`/api/v1/home/feed`、`/api/v1/videos/{videoId}`、`/api/v1/videos/{videoId}/playback`；仅完成契约与生成类型，尚未由 feed、video、playback 服务实现。
+- 阶段 3 视频读取 OpenAPI：`/api/v1/home/feed`、`/api/v1/videos/{videoId}`、`/api/v1/videos/{videoId}/playback`；video-service 已实现公开内容流和详情，playback-service 已实现独立播放清单投影与到期时间字段，gateway 已按路径路由。正式对象存储签名授权待实现。
 - 阶段 3 媒体上传 OpenAPI：`POST /api/v1/media/uploads`、`POST /api/v1/media/uploads/{uploadId}/complete`；media-service 已实现本地可测试的上传会话、幂等完成、转码任务和 Outbox，真实 S3 与 Identity RPC 适配待补齐。
 - 阶段 3 内部转码契约：Protobuf/Dubbo Triple `MediaTranscodeJobService` 支持领取、完成和失败回报。`media-service` 以租约和条件更新保持唯一写入；`transcode-worker` 通过 Jaffree 编排 FFmpeg 生成 HLS 与封面，当前本地工作区适配器仅用于可测试开发。
 
@@ -105,6 +105,7 @@ implementationStatus: 阶段 2 已完成；阶段 3 进行中，视频读取契�
 | 2026-08-16 | 阶段 3 开源方案与上传契约 | 官方资料、源仓库与许可证调研；OpenAPI lint 与 TypeScript 生成 | AWS SDK for Java 2.x + SeaweedFS + FFmpeg 进入实现基线；上传契约校验通过，保留既有未使用组件警告 |
 | 2026-08-16 | media-service 上传主链路 | H2 PostgreSQL 兼容模式下的 Flyway、幂等会话、完成、转码任务和 Outbox 集成测试 | 通过；真实 S3、Identity RPC、RocketMQ 与 FFmpeg 集成待 Docker 环境补充 |
 | 2026-08-16 | 转码任务租约与 Worker | Protobuf Triple 生成，media-service V1-V2 Flyway、任务领取、完成回报、`media.asset.transcoded.v1` Outbox 与 Worker 编排测试 | 通过；本机未安装 FFmpeg 和 Docker，尚未执行真实媒体转码或跨进程 Dubbo |
+| 2026-08-16 | 视频与播放公开读取 | video/playback Flyway V1、首页内容流、公开视频详情、播放清单与错误信封的 MockMvc 集成测试 | 6 个测试通过；H2 PostgreSQL 兼容模式验证，真实 PostgreSQL、Gateway、对象存储及跨进程服务联调待 Docker 环境补充 |
 
 ## 9. 已确定风险
 

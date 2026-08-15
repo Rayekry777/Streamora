@@ -3,9 +3,9 @@
 ```yaml
 version: 3
 updatedAt: 2026-08-16
-currentMigrationVersion: identity/admin/pet/media V1-V2
-implementedTables: 14
-status: 阶段 2 身份、RBAC 与宠物实例表已完成；阶段 3 媒体上传会话、可租约的转码任务与 Outbox 已实现
+currentMigrationVersion: identity/admin/pet/media V1-V2; video/playback V1
+implementedTables: 18
+status: 阶段 2 身份、RBAC 与宠物实例表已完成；阶段 3 媒体上传会话、可租约的转码任务与 Outbox、视频公开读模型和播放清单投影已实现
 ```
 
 ## 1. 当前结构
@@ -55,5 +55,7 @@ status: 阶段 2 身份、RBAC 与宠物实例表已完成；阶段 3 媒体上�
 | `V1__pet_instance.sql` | pet-service | 每用户唯一的个人宠物实例 | 已完成 |
 | `V1__media_upload.sql` | media-service | 原始媒体资产、分片上传会话、转码任务和 Outbox | 已实现，待阶段 3 验收 |
 | `V2__media_transcode_execution.sql` | media-service | 转码任务租约、重试失败状态、HLS/封面产物键与 Outbox 事件元数据 | 已实现，待 FFmpeg 与对象存储联调 |
+| `V1__video_catalog.sql` | video-service | 视频元数据、可见性、发布状态、标签与合法演示公开读模型 | 已实现，待阶段 3 验收 |
+| `V1__playback_manifest.sql` | playback-service | 公开播放清单投影与字幕轨道 | 已实现，待视频发布事件和对象存储签名联调 |
 
 容器初始化脚本不属于业务迁移历史，只负责空环境的角色、schema 和扩展准备。生产环境不得用它替代版本化 Flyway 迁移。H2 PostgreSQL 兼容模式已经验证 media V1-V2 等迁移；真实 PostgreSQL 容器验证因当前机器未安装 Docker 待补。

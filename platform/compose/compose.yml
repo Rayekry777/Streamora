@@ -65,7 +65,7 @@ services:
     profiles: *infra-profiles
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
-    command: ["sh", "-c", "psql -h postgres -U streamora_platform_admin -d streamora -v ON_ERROR_STOP=1 -c 'GRANT CONNECT, CREATE ON DATABASE streamora TO streamora_identity, streamora_admin, streamora_pet'"]
+    command: ["sh", "-c", "psql -h postgres -U streamora_platform_admin -d streamora -v ON_ERROR_STOP=1 -c 'GRANT CONNECT, CREATE ON DATABASE streamora TO streamora_identity, streamora_admin, streamora_pet, streamora_video, streamora_media, streamora_playback'"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -355,6 +355,14 @@ services:
     environment:
       <<: *backend-environment
       SERVER_PORT: "8084"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/streamora?currentSchema=video
+      SPRING_DATASOURCE_USERNAME: streamora_video
+      SPRING_DATASOURCE_PASSWORD: ${STREAMORA_SERVICE_DB_PASSWORD:?请在 .env 中设置 STREAMORA_SERVICE_DB_PASSWORD}
+    depends_on:
+      nacos:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     expose: ["8084"]
 
   media-service:
@@ -368,6 +376,9 @@ services:
     environment:
       <<: *backend-environment
       SERVER_PORT: "8085"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/streamora?currentSchema=media
+      SPRING_DATASOURCE_USERNAME: streamora_media
+      SPRING_DATASOURCE_PASSWORD: ${STREAMORA_SERVICE_DB_PASSWORD:?请在 .env 中设置 STREAMORA_SERVICE_DB_PASSWORD}
     expose: ["8085"]
 
   transcode-worker:
@@ -394,6 +405,14 @@ services:
     environment:
       <<: *backend-environment
       SERVER_PORT: "8087"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/streamora?currentSchema=playback
+      SPRING_DATASOURCE_USERNAME: streamora_playback
+      SPRING_DATASOURCE_PASSWORD: ${STREAMORA_SERVICE_DB_PASSWORD:?请在 .env 中设置 STREAMORA_SERVICE_DB_PASSWORD}
+    depends_on:
+      nacos:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     expose: ["8087"]
 
   danmaku-service:

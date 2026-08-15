@@ -20,6 +20,15 @@ spring:
           metrics:
             enabled: true
           routes:
+            - id: home-feed-api
+              uri: lb://video-service
+              predicates:
+                - Path=/api/v1/home/feed
+            # The more specific playback path must precede the video metadata catch-all.
+            - id: playback-api
+              uri: lb://playback-service
+              predicates:
+                - Path=/api/v1/videos/*/playback
             - id: admin-api
               uri: lb://admin-service
               predicates:
@@ -40,10 +49,6 @@ spring:
               uri: lb://media-service
               predicates:
                 - Path=/api/v1/media/**
-            - id: playback-api
-              uri: lb://playback-service
-              predicates:
-                - Path=/api/v1/playback/**
             - id: danmaku-api
               uri: lb://danmaku-service
               predicates:
