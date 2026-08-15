@@ -107,7 +107,6 @@ services:
       NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-U3RyZWFtb3JhQ2xvc2VkRGVtb05hY29zVG9rZW5Gb3JMb2NhbE9ubHkyMDI2}
       NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-streamora-core}
       NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-closed-demo}
-      NACOS_EXTENSION_AI_ENABLED: "false"
       JVM_XMS: 512m
       JVM_XMX: 512m
       JVM_XMN: 256m
@@ -117,7 +116,7 @@ services:
       - "9848"
       - "9849"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8848/nacos/v1/console/health/readiness || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8848/nacos/v3/admin/core/state/readiness || exit 1"]
       interval: 15s
       timeout: 5s
       start_period: 60s
