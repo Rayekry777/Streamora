@@ -103,6 +103,8 @@ services:
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
+      # Nacos 3 镜像即使关闭鉴权也要求提供合法的 Base64 JWT 签名材料；生产环境在本机 .env 覆盖。
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-U3RyZWFtb3JhQ2xvc2VkRGVtb05hY29zVG9rZW5Gb3JMb2NhbE9ubHkyMDI2}
       NACOS_EXTENSION_AI_ENABLED: "false"
       JVM_XMS: 512m
       JVM_XMX: 512m
@@ -126,8 +128,6 @@ services:
     profiles: *infra-profiles
     restart: unless-stopped
     command: ["sh", "mqnamesrv"]
-    volumes:
-      - rocketmq-namesrv-logs:/home/rocketmq/logs
     expose:
       - "9876"
     healthcheck:
@@ -142,17 +142,16 @@ services:
     image: apache/rocketmq:5.3.1
     profiles: *infra-profiles
     restart: unless-stopped
-    command: ["sh", "mqbroker", "-n", "rocketmq-namesrv:9876", "--enable-proxy"]
+    # 当前服务使用 RocketMQ 原生客户端；Proxy 作为独立组件按需启用，避免与 Broker 共享日志目录。
+    command: ["sh", "mqbroker", "-n", "rocketmq-namesrv:9876"]
     environment:
       NAMESRV_ADDR: rocketmq-namesrv:9876
     volumes:
-      - rocketmq-broker-logs:/home/rocketmq/logs
       - rocketmq-broker-store:/home/rocketmq/store
     expose:
       - "10909"
       - "10911"
       - "10912"
-      - "8081"
     depends_on:
       rocketmq-namesrv:
         condition: service_healthy
