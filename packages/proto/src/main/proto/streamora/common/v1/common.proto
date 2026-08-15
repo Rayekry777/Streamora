@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package streamora.common.v1;
+
+option java_multiple_files = true;
+option java_package = "com.streamora.contract.common.v1";
+option java_outer_classname = "CommonContracts";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+message RequestContext {
+  string request_id = 1;
+  string trace_id = 2;
+  string subject_id = 3;
+  string subject_type = 4;
+  google.protobuf.Timestamp deadline = 5;
+}
+
+message CursorPageRequest {
+  string cursor = 1;
+  int32 limit = 2;
+}
+
+message DomainEventEnvelope {
+  string event_id = 1;
+  string event_type = 2;
+  int32 schema_version = 3;
+  string aggregate_id = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+  string trace_id = 6;
+  string producer = 7;
+  google.protobuf.Struct payload = 8;
+}
+

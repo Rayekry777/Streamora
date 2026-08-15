@@ -9,13 +9,17 @@ Streamora 是面向封闭演示 MVP 的视频社区与 AI 宠物项目。用户�
 - [系统架构](docs/architecture/SYSTEM_ARCHITECTURE.md)
 - [服务边界](docs/architecture/SERVICE_BOUNDARIES.md)
 - [后端开发契约](docs/development/BACKEND_DEVELOPMENT.md)
+- [前端开发契约](docs/development/FRONTEND_DEVELOPMENT.md)
 - [数据库结构与规划](docs/data/DATABASE_SCHEMA.md)
 - [API 契约](docs/contracts/API_CONVENTIONS.md)
 - [事件契约](docs/contracts/EVENT_CONTRACTS.md)
 - [数据归属](docs/data/DATA_OWNERSHIP.md)
 - [阶段 0 验收](docs/acceptance/PHASE_0_ACCEPTANCE.md)
+- [阶段 1 验收](docs/acceptance/PHASE_1_ACCEPTANCE.md)
+- [后端容器部署](docs/deployment/DOCKER_BACKEND_DEPLOYMENT.md)
+- [前端容器部署](docs/deployment/DOCKER_FRONTEND_DEPLOYMENT.md)
 
-当前处于阶段 0，尚未创建可运行服务。阶段 1 才会初始化两个前端、17 个后端运行单元和本地基础设施配置。
+当前阶段 1 已完成代码侧出口并处于“待验收”：两个前端、17 个后端运行单元、公共契约与三档本地基础设施配置均已建立。由于本机尚未安装 Docker，容器启动验证仍需安装 Docker Desktop 后执行。
 
 ## 顶层目录
 

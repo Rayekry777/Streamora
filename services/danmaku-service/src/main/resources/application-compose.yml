@@ -1,0 +1,23 @@
+spring:
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?group=STREAMORA&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+      discovery:
+        enabled: true
+        server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+      config:
+        enabled: true
+        server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:sentinel:8858}
+
+dubbo:
+  registry:
+    address: nacos://${NACOS_SERVER_ADDR:nacos:8848}
+  protocol:
+    name: tri
+    port: ${DUBBO_PORT:-1}

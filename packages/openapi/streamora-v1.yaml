@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: Streamora External API
+  version: 0.1.0
+  description: Streamora 用户端与管理端 HTTP 契约入口；阶段 1 先固定公共信封和分页结构。
+servers:
+  - url: /
+    description: 通过同源网关访问
+paths: {}
+components:
+  schemas:
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - reason
+      properties:
+        field:
+          type: string
+        reason:
+          type: string
+    ApiError:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - details
+      properties:
+        code:
+          type: string
+          example: VIDEO_NOT_FOUND
+        message:
+          type: string
+          example: 视频不存在或不可访问
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - requestId
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiError'
+        requestId:
+          type: string
+    CursorPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - hasMore
+      properties:
+        items:
+          type: array
+          items: {}
+        nextCursor:
+          type:
+            - string
+            - 'null'
+        hasMore:
+          type: boolean
+

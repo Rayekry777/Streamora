@@ -5,12 +5,12 @@ version: 1
 updatedAt: 2026-08-15
 currentMigrationVersion: none
 implementedTables: 0
-status: 未实现
+status: 基础 schema 初始化已实现，业务表未实现
 ```
 
 ## 1. 当前结构
 
-当前没有数据库、迁移或业务表。下文是阶段 1–7 的规划，不代表已实现结构。实际结构建立后以各服务 Flyway 历史为真源。
+当前没有业务表或 Flyway 迁移。`platform/compose/postgres/init/001-init-streamora.sh` 已实现 pgvector 扩展以及 15 个有状态服务的独立角色与 schema 初始化；表结构仍是阶段 2–7 的规划。实际结构建立后以各服务 Flyway 历史为真源。
 
 ## 2. 隔离规则
 
@@ -51,3 +51,5 @@ status: 未实现
 | 迁移 | 所属服务 | 内容 | 状态 |
 |---|---|---|---|
 | 无 | - | 尚未创建 Flyway 迁移 | 未实现 |
+
+阶段 1 的容器初始化脚本不属于业务迁移历史，只负责空环境的角色、schema 和扩展准备。生产环境不得用它替代版本化 Flyway 迁移。

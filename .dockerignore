@@ -1,0 +1,46 @@
+# 版本控制、编辑器与本地状态
+.git
+.github
+.idea
+.vscode
+.codex
+**/*.iml
+
+# 本地配置、密钥与证书
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/secrets
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.jks
+
+# Java、Node 与测试产物
+**/target
+**/node_modules
+**/dist
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+
+# 日志、运行数据与媒体缓存
+**/*.log
+runtime
+tmp
+temp
+storage
+uploads
+platform/data
+platform/volumes
+**/.transcode-cache
+**/transcode-output
+**/hls-output
+
+# 文档和不参与镜像构建的工程资料
+docs
+.agents
+README.md
+

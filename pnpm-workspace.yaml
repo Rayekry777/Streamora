@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/ui-tokens
+
+allowBuilds:
+  vue-demi: true
+
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi

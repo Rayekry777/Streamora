@@ -7,12 +7,12 @@ version: 1
 updatedAt: 2026-08-15
 scope: Streamora 17 个后端运行单元
 reviewStatus: pending
-implementationStatus: 未实现
+implementationStatus: 阶段 1 待验收
 ```
 
 ## 1. 当前工程事实
 
-- 当前工作区只有阶段 0 设计与 Skill，没有 Maven 模块、源码、迁移或可运行服务。
+- 阶段 0 设计与 Skill 已完成；阶段 1 已创建 Maven 模块、17 个服务骨架、公共契约和基础设施配置，等待用户验收。
 - 目标基线：Java 21、Spring Boot 3.5.16、Spring Cloud 2025.0.0、Spring Cloud Alibaba 2025.0.0.0。
 - 内部同步：Dubbo 3.3.6 Triple + Protobuf；异步：RocketMQ 5.3.1。
 - 服务发现与配置：Nacos 3.0.3；流量保护：Sentinel 1.8.9。
@@ -60,14 +60,14 @@ implementationStatus: 未实现
 
 ## 5. 数据库演进
 
-当前没有迁移。阶段 1 为各有状态服务建立独立 schema、用户和 Flyway 基线；已执行迁移只增不改。
+当前没有业务迁移。阶段 1 已通过 PostgreSQL 容器初始化脚本为 15 个有状态服务建立独立 schema 和用户；Flyway 基线随对应领域首次建表引入，已执行迁移只增不改。
 
 ## 6. 实施阶段
 
 | 阶段 | 后端交付 | 状态 |
 |---|---|---|
-| 0 | 服务边界、API/事件契约、数据归属 | 待验收 |
-| 1 | 17 个运行单元、公共 BOM、配置发现和基础设施 | 未实现 |
+| 0 | 服务边界、API/事件契约、数据归属 | 已完成 |
+| 1 | 17 个运行单元、公共 BOM、配置发现和基础设施 | 待验收 |
 | 2–8 | 见 [项目路线图](../project/PROJECT_ROADMAP.md) | 未实现 |
 
 ## 7. 验收条件
@@ -84,6 +84,9 @@ implementationStatus: 未实现
 | 2026-08-15 | 环境与空工作区 | 工作区扫描、Java/Maven/Node/pnpm 版本检查 | 通过；Docker 未安装 |
 | 2026-08-15 | 阶段 0 契约 | Skill 官方校验、占位符扫描、17 服务集合检查、本地链接检查 | 通过 |
 | 2026-08-15 | 仓库目录分类 | 根目录审计、全部 Markdown 本地链接检查、三套 Skill 复验 | 通过；根目录仅保留 README |
+| 2026-08-15 | 17 个运行单元 | Maven Reactor 测试、随机端口 HTTP liveness、可执行 JAR 打包 | 17/17 通过 |
+| 2026-08-15 | 依赖对齐 | 移除会覆盖 Spring 6.2 的 Dubbo 全量 BOM，仅管理 Starter 版本 | Spring Boot 3.5.16 + Dubbo 3.3.6 上下文通过 |
+| 2026-08-15 | 基础设施配置 | 5 个 YAML 解析、30 个 Compose 服务、17 个后端单元及 3 个 Profile 检查 | 静态校验通过；Docker 运行待安装后验证 |
 
 ## 9. 已确定风险
 

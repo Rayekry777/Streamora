@@ -1,0 +1,89 @@
+spring:
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?group=STREAMORA&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+      discovery:
+        enabled: true
+        server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+      config:
+        enabled: true
+        server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:sentinel:8858}
+    gateway:
+      server:
+        webflux:
+          metrics:
+            enabled: true
+          routes:
+            - id: admin-api
+              uri: lb://admin-service
+              predicates:
+                - Path=/admin-api/v1/**
+            - id: identity-api
+              uri: lb://identity-service
+              predicates:
+                - Path=/api/v1/auth/**
+            - id: user-api
+              uri: lb://user-service
+              predicates:
+                - Path=/api/v1/users/**
+            - id: video-api
+              uri: lb://video-service
+              predicates:
+                - Path=/api/v1/videos/**
+            - id: media-api
+              uri: lb://media-service
+              predicates:
+                - Path=/api/v1/media/**
+            - id: playback-api
+              uri: lb://playback-service
+              predicates:
+                - Path=/api/v1/playback/**
+            - id: danmaku-api
+              uri: lb://danmaku-service
+              predicates:
+                - Path=/api/v1/danmaku/**
+            - id: comment-api
+              uri: lb://comment-service
+              predicates:
+                - Path=/api/v1/comments/**
+            - id: engagement-api
+              uri: lb://engagement-service
+              predicates:
+                - Path=/api/v1/engagement/**
+            - id: feed-api
+              uri: lb://feed-service
+              predicates:
+                - Path=/api/v1/feed/**
+            - id: search-api
+              uri: lb://search-service
+              predicates:
+                - Path=/api/v1/search/**
+            - id: pet-api
+              uri: lb://pet-service
+              predicates:
+                - Path=/api/v1/pets/**
+            - id: agent-api
+              uri: lb://agent-service
+              predicates:
+                - Path=/api/v1/agent/**
+            - id: moderation-api
+              uri: lb://moderation-service
+              predicates:
+                - Path=/api/v1/reports/**
+            - id: notification-api
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/v1/notifications/**
+
+dubbo:
+  registry:
+    address: nacos://${NACOS_SERVER_ADDR:nacos:8848}
+  protocol:
+    name: tri
+    port: ${DUBBO_PORT:-1}

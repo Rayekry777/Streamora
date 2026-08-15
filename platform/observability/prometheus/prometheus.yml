@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: streamora-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - gateway-service:8080
+          - admin-service:8081
+          - identity-service:8082
+          - user-service:8083
+          - video-service:8084
+          - media-service:8085
+          - transcode-worker:8086
+          - playback-service:8087
+          - danmaku-service:8088
+          - comment-service:8089
+          - engagement-service:8090
+          - feed-service:8091
+          - search-service:8092
+          - pet-service:8093
+          - agent-service:8094
+          - moderation-service:8095
+          - notification-service:8096
+

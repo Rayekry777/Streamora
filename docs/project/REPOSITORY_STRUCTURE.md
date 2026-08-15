@@ -35,6 +35,7 @@ Streamora/
 ### `platform/`
 
 - `platform/compose/`：`infra`、`core`、`full` Compose 配置。
+- `platform/docker/`：后端通用镜像构建文件。
 - `platform/observability/`：Prometheus、Grafana、Loki、Tempo 配置。
 - `platform/gateway/`：仅与边缘代理、证书和静态路由有关的部署资源。
 - `platform/scripts/`：可重复的本地启动、检查和运维脚本。
@@ -49,6 +50,7 @@ Streamora/
 | `contracts/` | HTTP、RPC、SSE 和事件约定 |
 | `data/` | 数据库结构与数据归属 |
 | `acceptance/` | 各阶段验收证据 |
+| `deployment/` | Docker、Compose、发布和运维说明 |
 
 ## 命名规则
 
@@ -56,4 +58,3 @@ Streamora/
 - Java 服务目录使用计划中的 `<domain>-service` 名称；worker 保留 `transcode-worker`。
 - 文档使用大写 snake case，便于与源码目录区分。
 - 新文件必须放入负责它的最窄目录；根目录只保留 `README.md` 和必要的仓库级工具配置。
-
