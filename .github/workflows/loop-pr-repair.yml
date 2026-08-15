@@ -28,6 +28,9 @@ jobs:
       attempt: ${{ steps.state.outputs.attempt }}
       mode: ${{ steps.state.outputs.mode }}
       blocked: ${{ steps.state.outputs.blocked }}
+      deepseek_key_configured: ${{ steps.credentials.outputs.deepseek_key_configured }}
+      openai_key_configured: ${{ steps.credentials.outputs.openai_key_configured }}
+      repair_token_configured: ${{ steps.credentials.outputs.repair_token_configured }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -82,6 +85,19 @@ jobs:
             echo "blocked=$blocked"
           } >> "$GITHUB_OUTPUT"
 
+      - name: 检查自动修复凭据
+        id: credentials
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEPLOY_REPAIR_GITHUB_TOKEN: ${{ secrets.DEPLOY_REPAIR_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$DEEPSEEK_API_KEY" ]] && echo "deepseek_key_configured=true" >> "$GITHUB_OUTPUT" || echo "deepseek_key_configured=false" >> "$GITHUB_OUTPUT"
+          [[ -n "$OPENAI_API_KEY" ]] && echo "openai_key_configured=true" >> "$GITHUB_OUTPUT" || echo "openai_key_configured=false" >> "$GITHUB_OUTPUT"
+          [[ -n "$DEPLOY_REPAIR_GITHUB_TOKEN" ]] && echo "repair_token_configured=true" >> "$GITHUB_OUTPUT" || echo "repair_token_configured=false" >> "$GITHUB_OUTPUT"
+
       - name: 下载前端诊断
         continue-on-error: true
         uses: actions/download-artifact@v5
@@ -112,7 +128,9 @@ jobs:
     needs: prepare
     if: >-
       needs.prepare.outputs.blocked == 'false' &&
-      needs.prepare.outputs.mode == 'ci-repair'
+      needs.prepare.outputs.mode == 'ci-repair' &&
+      needs.prepare.outputs.deepseek_key_configured == 'true' &&
+      needs.prepare.outputs.repair_token_configured == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
@@ -237,7 +255,9 @@ jobs:
       always() &&
       needs.prepare.result == 'success' &&
       needs.prepare.outputs.blocked == 'false' &&
-      needs.prepare.outputs.mode == 'root-cause'
+      needs.prepare.outputs.mode == 'root-cause' &&
+      needs.prepare.outputs.openai_key_configured == 'true' &&
+      needs.prepare.outputs.repair_token_configured == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -263,29 +283,25 @@ jobs:
           name: loop-pr-repair-input-${{ github.event.workflow_run.id }}
           path: loop-diagnostics
 
-      - name: 由 DeepSeek 根因 Agent 执行第四轮修复
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          DEEPSEEK_REPAIR_MODEL: ${{ vars.DEEPSEEK_REPAIR_MODEL || 'deepseek-chat' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/ci/deepseek-patch-agent.mjs \
-            --instruction .github/codex/prompts/pr-root-cause-repair.md \
-            --diagnostics loop-diagnostics \
-            --mode pr-root-cause \
-            --patch loop-root-cause.patch \
-            --report loop-root-cause-report.md
-          git apply --check loop-root-cause.patch
-          git apply loop-root-cause.patch
+      - name: 由 Codex 根因 Agent 执行第四轮修复
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: >-
+            Read .github/codex/prompts/pr-root-cause-repair.md and loop-diagnostics/.
+            This is root-cause attempt 4 for PR #${{ needs.prepare.outputs.pr_number }}.
+            Root commit: ${{ needs.prepare.outputs.root_sha }}. Make only the smallest
+            permitted repair. Do not commit, push, access secrets, or change prohibited files.
+          output-file: loop-root-cause-report.md
 
       - name: 校验根因修复边界
         shell: bash
         run: |
           set -euo pipefail
+          git add -N -- .
           git diff --check
           scripts/ci/validate-repair-patch.sh
-          changed_files="$(git diff --name-only -- . ':!loop-diagnostics' ':!loop-root-cause.patch' ':!loop-root-cause-report.md')"
+          changed_files="$(git diff --name-only -- . ':!loop-diagnostics' ':!loop-root-cause-report.md')"
           test -n "$changed_files"
           while IFS= read -r file; do
             [[ -n "$file" ]] || continue
@@ -310,8 +326,8 @@ jobs:
           git config user.name "streamora-loop-root-cause[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git reset -- loop-diagnostics loop-root-cause.patch loop-root-cause-report.md || true
-          git diff --cached --quiet && { echo "DeepSeek produced no eligible root-cause repair." >&2; exit 1; }
+          git reset -- loop-diagnostics loop-root-cause-report.md || true
+          git diff --cached --quiet && { echo "Codex produced no eligible root-cause repair." >&2; exit 1; }
           git commit -F - <<EOF
           fix(治理): PR #${PR_NUMBER} 根因修复
 
@@ -321,7 +337,7 @@ jobs:
 
           验证结果：
           - git diff --check：通过
-          - 精确失败检查和相关回归由 DeepSeek 按根因报告执行
+          - 精确失败检查和相关回归由 Codex 按根因报告执行
 
           未运行项：
           - 完整前后端验证由本次推送触发的 GitHub Actions 执行
@@ -380,6 +396,41 @@ jobs:
             exit 0
           fi
           gh issue create --title "$title" --label "agent:blocked" --body "PR #${PR_NUMBER} 的三轮最小修复与第四轮根因修复均未通过。自动写入已停止。失败验证：${RUN_URL}；根提交：${ROOT_SHA}。"
+
+  report-missing-credentials:
+    needs: prepare
+    if: >-
+      always() &&
+      needs.prepare.result == 'success' &&
+      needs.prepare.outputs.blocked == 'false' &&
+      ((needs.prepare.outputs.mode == 'ci-repair' && needs.prepare.outputs.deepseek_key_configured != 'true') ||
+       (needs.prepare.outputs.mode == 'root-cause' && needs.prepare.outputs.openai_key_configured != 'true') ||
+       needs.prepare.outputs.repair_token_configured != 'true')
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: 创建缺失凭据诊断 Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.prepare.outputs.pr_number }}
+          ROOT_SHA: ${{ needs.prepare.outputs.root_sha }}
+          MODE: ${{ needs.prepare.outputs.mode }}
+          DEEPSEEK_READY: ${{ needs.prepare.outputs.deepseek_key_configured }}
+          OPENAI_READY: ${{ needs.prepare.outputs.openai_key_configured }}
+          TOKEN_READY: ${{ needs.prepare.outputs.repair_token_configured }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          if [[ "$MODE" == "ci-repair" && "$DEEPSEEK_READY" != "true" ]]; then missing+=("DEEPSEEK_API_KEY（前三轮最小补丁）"); fi
+          if [[ "$MODE" == "root-cause" && "$OPENAI_READY" != "true" ]]; then missing+=("OPENAI_API_KEY（第四轮 Codex 根因修复）"); fi
+          if [[ "$TOKEN_READY" != "true" ]]; then missing+=("DEPLOY_REPAIR_GITHUB_TOKEN（推送修复提交）"); fi
+          title="Loop 自动修复未启用: PR #${PR_NUMBER} ${ROOT_SHA:0:12}"
+          existing="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')"
+          [[ -n "$existing" ]] && exit 0
+          gh issue create --title "$title" --body "当前轮次缺少 GitHub Actions secret：${missing[*]}。请在 Settings -> Secrets and variables -> Actions 添加后，重新运行失败验证。验证：${RUN_URL}。"
 
   report-agent-failure:
     needs: [prepare, minimal-repair, root-cause-repair]
