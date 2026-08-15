@@ -57,7 +57,7 @@ class AdminAuthFlowIntegrationTest {
         MvcResult result = mockMvc.perform(post("/admin-api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"login":"operator","password":"Correct-Horse-42"}
+                                {"login":"admin","password":"123456"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.audience").value("ADMIN"))
@@ -86,7 +86,7 @@ class AdminAuthFlowIntegrationTest {
         MvcResult login = mockMvc.perform(post("/admin-api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"login":"operator","password":"Correct-Horse-42"}
+                                {"login":"admin","password":"123456"}
                                 """))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -134,7 +134,7 @@ class AdminAuthFlowIntegrationTest {
                 @Override
                 public Optional<AuthenticatedAdmin> authenticate(
                         String login, String password, String userAgent, String ipAddress, String traceId) {
-                    if (!"operator".equals(login) || !"Correct-Horse-42".equals(password)) {
+                    if (!"admin".equals(login) || !"123456".equals(password)) {
                         return Optional.empty();
                     }
                     return Optional.of(new AuthenticatedAdmin(

@@ -51,7 +51,7 @@ async function submit(): Promise<void> {
             v-model="password"
             type="password"
             autocomplete="current-password"
-            minlength="12"
+            minlength="6"
             maxlength="72"
             required
           >

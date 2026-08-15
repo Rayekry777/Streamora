@@ -3,7 +3,7 @@ import { adminApiRequest } from './http'
 
 export type AdminSession = components['schemas']['AdminSessionView']
 type AdminSessionResponse = components['schemas']['AdminSessionResponse']
-type LoginRequest = components['schemas']['LoginRequest']
+type LoginRequest = components['schemas']['AdminLoginRequest']
 
 export async function loginAdmin(request: LoginRequest): Promise<AdminSession> {
   const response = await adminApiRequest<AdminSessionResponse>('/admin-api/v1/auth/login', {

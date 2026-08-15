@@ -48,7 +48,7 @@ Set-Location platform/compose
 Copy-Item .env.example .env
 ```
 
-编辑 `.env`，替换全部 `replace-with-...` 值。三档启动命令：
+`.env.example` 已提供封闭演示默认值。初始 Streamora 管理员为 `admin / 123456`；MinIO 因为密码最短为 8 位，使用 `admin / admin123`。这些值不能用于公网或共享环境。三档启动命令：
 
 ```powershell
 docker compose --profile infra up -d
@@ -115,4 +115,3 @@ docker compose exec identity-service wget -qO- http://127.0.0.1:8082/actuator/he
 - 容器内连接失败：连接地址必须使用 Compose 服务名，不能使用宿主机的 `127.0.0.1`。
 - 内存溢出：同时检查容器上限、非堆内存和线程数，不能只提高 Java 堆百分比。
 - 持久卷权限错误：确认 Docker Desktop 共享目录和卷权限，不要以 root 身份运行应用规避问题。
-

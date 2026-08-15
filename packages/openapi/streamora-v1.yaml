@@ -93,7 +93,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: '#/components/schemas/AdminLoginRequest'
       responses:
         '200':
           description: 管理员登录并完成角色装载
@@ -278,6 +278,19 @@ components:
         password:
           type: string
           minLength: 12
+          maxLength: 72
+    AdminLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          minLength: 3
+          maxLength: 64
+        password:
+          type: string
+          minLength: 6
           maxLength: 72
     UserRegistrationRequest:
       type: object

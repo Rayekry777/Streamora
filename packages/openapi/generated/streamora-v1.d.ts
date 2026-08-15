@@ -188,6 +188,10 @@ export interface components {
             login: string;
             password: string;
         };
+        AdminLoginRequest: {
+            login: string;
+            password: string;
+        };
         UserRegistrationRequest: {
             login: string;
             displayName: string;
@@ -381,7 +385,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LoginRequest"];
+                "application/json": components["schemas"]["AdminLoginRequest"];
             };
         };
         responses: {

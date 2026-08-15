@@ -96,6 +96,7 @@ implementationStatus: 阶段 2 待验收
 | 2026-08-15 | admin-service | Strict Cookie、RBAC、权限拒绝、用户 Cookie 隔离、审计 | 4 个测试通过 |
 | 2026-08-15 | pet-service | 匿名公共宠物、管理员 Cookie 忽略、个人宠物复用 | 4 个测试通过 |
 | 2026-08-15 | 契约 | Redocly Lint、OpenAPI 类型生成、Dubbo Protobuf 代码生成 | 通过；保留 1 个阶段 1 游标组件未使用警告 |
+| 2026-08-15 | 封闭演示管理员登录 | `admin / 123456` 的管理端请求校验与 admin-service 集成测试 | 通过；生产环境必须改用强密码 |
 
 ## 9. 已确定风险
 
