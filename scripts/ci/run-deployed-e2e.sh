@@ -42,6 +42,7 @@ fi
 docker run --rm \
   --network host \
   --ipc=host \
+  --user "$(id -u):$(id -g)" \
   -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
   -e E2E_WEB_BASE_URL="http://${web_address}" \
   -e E2E_ADMIN_BASE_URL="http://${admin_address}" \
