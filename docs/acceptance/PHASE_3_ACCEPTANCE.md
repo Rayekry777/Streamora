@@ -28,7 +28,7 @@
 |---|---|---|
 | S3 兼容对象存储客户端 | [MinIO Java SDK](https://github.com/minio/minio-java) 支持 S3 兼容对象存储且为 Apache-2.0；[AWS SDK for Java 2.x](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/java_s3_code_examples.html) 提供分片上传、预签名 URL 和异步客户端 | 采用 AWS SDK for Java 2.x 的 S3 API，通过 `ObjectStore` 端口隔离，兼容 SeaweedFS、Ceph RGW 和云 S3 |
 | 自托管对象存储 | [SeaweedFS](https://github.com/seaweedfs/seaweedfs) 为 Apache-2.0 并提供 S3 API；[Ceph RGW](https://docs.ceph.com/en/latest/radosgw/index.html) 提供 S3 兼容网关；现有 MinIO 社区服务端为 AGPLv3 且仓库已归档 | 容器联调前将 MinIO 替换为 SeaweedFS；Ceph 作为生产规模化候选。MinIO 不纳入默认封闭演示运行栈 |
-| HLS 转码 | [FFmpeg](https://ffmpeg.org/documentation.html) 提供媒体处理和 HLS muxer；[Jaffree](https://github.com/kokorin/Jaffree) 是 Apache-2.0 的 Java FFmpeg 命令包装器 | 采用 FFmpeg，Worker 通过项目 `TranscodeExecutor` 端口调用。正式镜像使用 LGPL 兼容构建，禁止引入 GPL 编码库；Jaffree 作为命令编排候选，先在 Worker PoC 验证后决定是否引入 |
+| HLS 转码 | [FFmpeg](https://ffmpeg.org/documentation.html) 提供媒体处理和 HLS muxer；[Jaffree](https://github.com/kokorin/Jaffree) 是 Apache-2.0 的 Java FFmpeg 命令包装器 | 采用 FFmpeg，Worker 通过 `HlsTranscodeExecutor` 端口调用；Jaffree `2024.08.29` 已通过编译和 Worker 编排 PoC。正式镜像使用 LGPL 兼容构建，禁止引入 GPL 编码库 |
 
 隔离方式：业务层不依赖 AWS、SeaweedFS 或 FFmpeg 类型；对象存储和转码均通过基础设施适配器接入。当前主机无 Docker，S3/FFmpeg 适配器的真实集成验证待容器环境可用后补充。
 
@@ -41,6 +41,7 @@
 | OpenAPI 校验 | `pnpm contract:lint` | 通过；保留既有 `CursorPage` 未使用警告 |
 | 类型生成 | `pnpm contract:generate` | 通过；用户端和管理端可使用新的生成类型 |
 | media-service 上传主链路 | `mvn "-Dtest=MediaUploadFlowIntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false" -pl services/media-service -am test` | 通过；H2 PostgreSQL 兼容模式完成 Flyway V1、重复创建、重复完成、唯一转码任务与单个 Outbox 事件验证 |
+| 转码任务契约与主链路 | `mvn "-Dtest=MediaUploadFlowIntegrationTest,TranscodeWorkerServiceTest" "-Dsurefire.failIfNoSpecifiedTests=false" -pl services/media-service,services/transcode-worker -am test` | 通过；生成 `MediaTranscodeJobService` Triple 契约，验证 media V1-V2、唯一租约、完成回报、`media.asset.transcoded.v1` Outbox 与 Worker 不持久化媒体状态 |
 
 ## 验收出口
 
@@ -48,7 +49,7 @@
 |---|---|---|
 | OpenAPI、Protobuf、事件和数据边界一致 | 进行中 | 视频读取和分片上传/完成契约已定义；视频生命周期、审核与事件 Protobuf 待补齐 |
 | 分片上传完成后创建可幂等的转码任务 | 部分达成 | media-service Flyway V1、上传会话、完成操作、唯一转码任务和 `media.upload.completed.v1` Outbox 已实现并通过服务内集成测试；真实 S3 上传与 RocketMQ 投递待补齐 |
-| 转码产出 HLS、封面和字幕并回报媒体服务 | 未开始 | 待实现 Worker 和 FFmpeg 集成测试 |
+| 转码产出 HLS、封面和字幕并回报媒体服务 | 部分达成 | Worker 已通过 Triple 领取任务，Jaffree 适配器生成 HLS VOD 清单和封面并回报 media-service；本机未安装 FFmpeg，未执行真实视频、字幕和对象存储集成测试 |
 | 审核通过后发布，用户端可取得 HLS 清单 | 未开始 | 待实现跨服务事件处理与端到端测试 |
 | 管理端可以查看任务并执行受权限保护的审核操作 | 未开始 | 待实现管理 API 与前端联调 |
 
@@ -56,6 +57,7 @@
 
 - 当前设备未安装 Docker，不能进行 MinIO、PostgreSQL、RocketMQ、Nacos 和 FFmpeg 容器的真实跨进程联调。
 - 封闭演示可先使用 H2 PostgreSQL 兼容模式和可替换的对象存储/转码适配器覆盖服务内集成测试；容器化联调必须在 Docker 可用后补充。
+- 当前主机未安装 FFmpeg，因此 Jaffree 仅完成编译与编排测试；HLS 分片、封面截图、字幕提取和真实 SeaweedFS/S3 发布均不得视为已验证。
 
 ## 用户验收
 

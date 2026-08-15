@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package streamora.media.v1;
+
+option java_multiple_files = true;
+option java_package = "com.streamora.contract.media.v1";
+option java_outer_classname = "MediaTranscodeJobProto";
+
+service MediaTranscodeJobService {
+  rpc ClaimNextJob(ClaimNextTranscodeJobRequest) returns (ClaimedTranscodeJob);
+  rpc CompleteJob(CompleteTranscodeJobCommand) returns (TranscodeJobMutationResult);
+  rpc FailJob(FailTranscodeJobCommand) returns (TranscodeJobMutationResult);
+}
+
+message ClaimNextTranscodeJobRequest {
+  string worker_id = 1;
+  string trace_id = 2;
+}
+
+message ClaimedTranscodeJob {
+  bool claimed = 1;
+  string job_id = 2;
+  string asset_id = 3;
+  string source_object_key = 4;
+  string output_prefix = 5;
+  string claim_token = 6;
+  int32 attempt_count = 7;
+}
+
+message CompleteTranscodeJobCommand {
+  string job_id = 1;
+  string asset_id = 2;
+  string claim_token = 3;
+  string manifest_object_key = 4;
+  string poster_object_key = 5;
+  string trace_id = 6;
+}
+
+message FailTranscodeJobCommand {
+  string job_id = 1;
+  string asset_id = 2;
+  string claim_token = 3;
+  string failure_code = 4;
+  string trace_id = 5;
+}
+
+message TranscodeJobMutationResult {
+  bool completed = 1;
+  string error_code = 2;
+}

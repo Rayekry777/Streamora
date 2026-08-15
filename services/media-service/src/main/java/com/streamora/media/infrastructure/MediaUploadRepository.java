@@ -87,6 +87,80 @@ public class MediaUploadRepository {
         return new MediaUploadCompletion(upload.uploadId(), upload.assetId(), jobId, "TRANSCODE_PENDING");
     }
 
+    /** Claims at most one pending or expired lease using a conditional update for cross-worker safety. */
+    public Optional<ClaimedJob> claimNext(String workerId, String claimToken, Instant now, Instant leaseExpiresAt) {
+        for (int retry = 0; retry < 3; retry++) {
+            JobCandidate candidate = jdbcTemplate.query("""
+                            SELECT j.id, j.asset_id, a.object_key, j.attempt_count
+                            FROM media.transcode_job j
+                            JOIN media.media_asset a ON a.id = j.asset_id
+                            WHERE j.status = 'PENDING' OR (j.status = 'RUNNING' AND j.claim_expires_at < ?)
+                            ORDER BY j.created_at
+                            LIMIT 1
+                            """,
+                    (resultSet, rowNumber) -> new JobCandidate(resultSet.getString("id"), resultSet.getString("asset_id"),
+                            resultSet.getString("object_key"), resultSet.getInt("attempt_count")),
+                    Timestamp.from(now)).stream().findFirst().orElse(null);
+            if (candidate == null) {
+                return Optional.empty();
+            }
+            int updated = jdbcTemplate.update("""
+                            UPDATE media.transcode_job
+                            SET status = 'RUNNING', attempt_count = attempt_count + 1, claim_token = ?, claimed_by = ?,
+                                claimed_at = ?, claim_expires_at = ?, failure_code = NULL, updated_at = ?
+                            WHERE id = ? AND (status = 'PENDING' OR (status = 'RUNNING' AND claim_expires_at < ?))
+                            """, claimToken, workerId, Timestamp.from(now), Timestamp.from(leaseExpiresAt), Timestamp.from(now),
+                    candidate.jobId(), Timestamp.from(now));
+            if (updated == 1) {
+                return Optional.of(new ClaimedJob(candidate.jobId(), candidate.assetId(), candidate.sourceObjectKey(),
+                        "hls/" + candidate.assetId() + "/", claimToken, candidate.attemptCount() + 1));
+            }
+        }
+        return Optional.empty();
+    }
+
+    public boolean completeTranscode(String jobId, String assetId, String claimToken, String manifestObjectKey,
+                                     String posterObjectKey, String traceId, Instant now) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE media.transcode_job
+                        SET status = 'COMPLETED', hls_manifest_key = ?, poster_key = ?, completed_at = ?,
+                            claim_expires_at = NULL, updated_at = ?
+                        WHERE id = ? AND asset_id = ? AND status = 'RUNNING' AND claim_token = ?
+                        """, manifestObjectKey, posterObjectKey, Timestamp.from(now), Timestamp.from(now), jobId, assetId, claimToken);
+        if (updated != 1) {
+            return false;
+        }
+        jdbcTemplate.update("UPDATE media.media_asset SET status = 'TRANSCODED', updated_at = ? WHERE id = ?",
+                Timestamp.from(now), assetId);
+        jdbcTemplate.update("""
+                        INSERT INTO media.outbox_event (id, event_type, aggregate_id, payload_json, occurred_at, schema_version, trace_id)
+                        VALUES (?, 'media.asset.transcoded.v1', ?, ?, ?, 1, ?)
+                        """, UUID.randomUUID().toString(), assetId,
+                "{\"assetId\":\"" + assetId + "\",\"manifestObjectKey\":\"" + manifestObjectKey + "\",\"posterObjectKey\":\"" + posterObjectKey + "\"}",
+                Timestamp.from(now), traceId);
+        return true;
+    }
+
+    public boolean failTranscode(String jobId, String assetId, String claimToken, String failureCode, Instant now) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE media.transcode_job
+                        SET status = CASE WHEN attempt_count >= 3 THEN 'FAILED' ELSE 'PENDING' END,
+                            failure_code = ?, claim_token = NULL, claimed_by = NULL, claimed_at = NULL,
+                            claim_expires_at = NULL, updated_at = ?
+                        WHERE id = ? AND asset_id = ? AND status = 'RUNNING' AND claim_token = ?
+                        """, failureCode, Timestamp.from(now), jobId, assetId, claimToken);
+        if (updated != 1) {
+            return false;
+        }
+        Integer terminal = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM media.transcode_job WHERE id = ? AND status = 'FAILED'", Integer.class, jobId);
+        if (terminal != null && terminal == 1) {
+            jdbcTemplate.update("UPDATE media.media_asset SET status = 'TRANSCODE_FAILED', updated_at = ? WHERE id = ?",
+                    Timestamp.from(now), assetId);
+        }
+        return true;
+    }
+
     public record StoredUpload(String uploadId, String assetId, String objectKey, String objectStoreUploadId,
                                long partSizeBytes, int expectedPartCount, Instant expiresAt, String status,
                                String transcodeJobId, String idempotencyKey) {
@@ -96,5 +170,12 @@ public class MediaUploadRepository {
             this(uploadId, assetId, objectKey, objectStoreUploadId, partSizeBytes, expectedPartCount, expiresAt, status,
                     transcodeJobId, null);
         }
+    }
+
+    private record JobCandidate(String jobId, String assetId, String sourceObjectKey, int attemptCount) {
+    }
+
+    public record ClaimedJob(String jobId, String assetId, String sourceObjectKey, String outputPrefix,
+                             String claimToken, int attemptCount) {
     }
 }

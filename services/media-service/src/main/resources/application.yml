@@ -71,3 +71,5 @@ streamora:
     upload:
       part-size-bytes: ${STREAMORA_MEDIA_PART_SIZE_BYTES:8388608}
       url-ttl-seconds: ${STREAMORA_MEDIA_URL_TTL_SECONDS:900}
+    transcode:
+      lease-seconds: ${STREAMORA_MEDIA_TRANSCODE_LEASE_SECONDS:900}
