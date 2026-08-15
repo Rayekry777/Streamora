@@ -170,7 +170,152 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ActivePetResponse'
+  /api/v1/media/uploads:
+    post:
+      summary: 创建分片上传会话
+      operationId: createMediaUpload
+      tags: [Media Upload]
+      security:
+        - userSession: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMediaUploadRequest'
+      responses:
+        '201':
+          description: 创建或按幂等键返回已有上传会话
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaUploadSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/media/uploads/{uploadId}/complete:
+    post:
+      summary: 完成分片上传并创建转码任务
+      operationId: completeMediaUpload
+      tags: [Media Upload]
+      security:
+        - userSession: []
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteMediaUploadRequest'
+      responses:
+        '200':
+          description: 原始资产已登记，转码任务已创建或已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaUploadCompletionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/home/feed:
+    get:
+      summary: 获取首页视频内容流
+      operationId: getHomeFeed
+      tags: [Video Feed]
+      security: []
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 32
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 首页焦点位、分类和游标视频流
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeFeedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /api/v1/videos/{videoId}:
+    get:
+      summary: 获取公开视频详情
+      operationId: getVideoDetail
+      tags: [Video]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/VideoId'
+      responses:
+        '200':
+          description: 视频详情、分集和相关推荐
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/videos/{videoId}/playback:
+    get:
+      summary: 获取视频播放清单
+      operationId: getVideoPlayback
+      tags: [Playback]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/VideoId'
+      responses:
+        '200':
+          description: HLS 播放清单与字幕轨道
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoPlaybackResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
+  parameters:
+    VideoId:
+      name: videoId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    UploadId:
+      name: uploadId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
   securitySchemes:
     userSession:
       type: apiKey
@@ -205,6 +350,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Conflict:
       description: 登录名已存在或请求冲突
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: 资源不存在或不可访问
       content:
         application/json:
           schema:
@@ -383,6 +534,297 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/ActivePetView'
+        requestId:
+          type: string
+    CreateMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [fileName, contentType, totalBytes]
+      properties:
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          type: string
+          pattern: '^video/.+$'
+          maxLength: 128
+        totalBytes:
+          type: integer
+          minimum: 1
+          maximum: 10737418240
+    UploadPartUrlView:
+      type: object
+      additionalProperties: false
+      required: [partNumber, url, expiresAt]
+      properties:
+        partNumber:
+          type: integer
+          minimum: 1
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+    MediaUploadSessionView:
+      type: object
+      additionalProperties: false
+      required: [uploadId, assetId, partSizeBytes, expiresAt, parts]
+      properties:
+        uploadId:
+          type: string
+        assetId:
+          type: string
+        partSizeBytes:
+          type: integer
+          minimum: 5242880
+        expiresAt:
+          type: string
+          format: date-time
+        parts:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/UploadPartUrlView'
+    MediaUploadSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/MediaUploadSessionView'
+        requestId:
+          type: string
+    CompletedUploadPartRequest:
+      type: object
+      additionalProperties: false
+      required: [partNumber, etag]
+      properties:
+        partNumber:
+          type: integer
+          minimum: 1
+        etag:
+          type: string
+          minLength: 1
+          maxLength: 512
+    CompleteMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [parts]
+      properties:
+        parts:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CompletedUploadPartRequest'
+    MediaUploadCompletionView:
+      type: object
+      additionalProperties: false
+      required: [uploadId, assetId, transcodeJobId, status]
+      properties:
+        uploadId:
+          type: string
+        assetId:
+          type: string
+        transcodeJobId:
+          type: string
+        status:
+          type: string
+          enum: [TRANSCODE_PENDING, TRANSCODING, COMPLETED, FAILED]
+    MediaUploadCompletionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/MediaUploadCompletionView'
+        requestId:
+          type: string
+    CreatorSummaryView:
+      type: object
+      additionalProperties: false
+      required: [creatorId, displayName, avatarUrl]
+      properties:
+        creatorId:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+    VideoCardView:
+      type: object
+      additionalProperties: false
+      required: [videoId, title, coverUrl, durationSeconds, creator, viewCount, publishedAt, category, recommendationReason]
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+          maxLength: 160
+        coverUrl:
+          type: string
+          format: uri
+        durationSeconds:
+          type: integer
+          minimum: 0
+        creator:
+          $ref: '#/components/schemas/CreatorSummaryView'
+        viewCount:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        category:
+          type: string
+        recommendationReason:
+          type:
+            - string
+            - 'null'
+    VideoCategoryView:
+      type: object
+      additionalProperties: false
+      required: [categoryId, label]
+      properties:
+        categoryId:
+          type: string
+        label:
+          type: string
+        icon:
+          type:
+            - string
+            - 'null'
+    HomeFeedView:
+      type: object
+      additionalProperties: false
+      required: [featuredVideo, categories, items, nextCursor, hasMore]
+      properties:
+        featuredVideo:
+          $ref: '#/components/schemas/VideoCardView'
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoCategoryView'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoCardView'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+        hasMore:
+          type: boolean
+    HomeFeedResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/HomeFeedView'
+        requestId:
+          type: string
+    VideoEpisodeView:
+      type: object
+      additionalProperties: false
+      required: [episodeId, title, durationSeconds, isCurrent]
+      properties:
+        episodeId:
+          type: string
+        title:
+          type: string
+        durationSeconds:
+          type: integer
+          minimum: 0
+        isCurrent:
+          type: boolean
+    VideoDetailView:
+      type: object
+      additionalProperties: false
+      required: [videoId, title, description, coverUrl, durationSeconds, creator, viewCount, publishedAt, category, tags, episodes, recommendedVideos]
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        durationSeconds:
+          type: integer
+          minimum: 0
+        creator:
+          $ref: '#/components/schemas/CreatorSummaryView'
+        viewCount:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        episodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoEpisodeView'
+        recommendedVideos:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoCardView'
+    VideoDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/VideoDetailView'
+        requestId:
+          type: string
+    SubtitleTrackView:
+      type: object
+      additionalProperties: false
+      required: [language, label, url]
+      properties:
+        language:
+          type: string
+        label:
+          type: string
+        url:
+          type: string
+          format: uri
+    VideoPlaybackView:
+      type: object
+      additionalProperties: false
+      required: [videoId, manifestUrl, posterUrl, subtitles, expiresAt]
+      properties:
+        videoId:
+          type: string
+        manifestUrl:
+          type: string
+          format: uri
+        posterUrl:
+          type: string
+          format: uri
+        subtitles:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubtitleTrackView'
+        expiresAt:
+          type: string
+          format: date-time
+    VideoPlaybackResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/VideoPlaybackView'
         requestId:
           type: string
     OperationsOverviewView:

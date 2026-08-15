@@ -3,6 +3,8 @@ packages:
   - packages/ui-tokens
 
 allowBuilds:
+  core-js: true
+  es5-ext: true
   vue-demi: true
 
 onlyBuiltDependencies:

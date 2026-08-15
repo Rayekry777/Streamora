@@ -51,4 +51,15 @@ management:
 info:
   app:
     name: ${spring.application.name}
-    phase: foundation
+    phase: transcode
+
+streamora:
+  media:
+    rpc-enabled: ${STREAMORA_MEDIA_RPC_ENABLED:false}
+  transcode:
+    worker-id: ${STREAMORA_TRANSCODE_WORKER_ID:transcode-worker-local}
+    poll-delay-ms: ${STREAMORA_TRANSCODE_POLL_DELAY_MS:2000}
+    ffmpeg-path: ${STREAMORA_TRANSCODE_FFMPEG_PATH:ffmpeg}
+    local-input-root: ${STREAMORA_TRANSCODE_LOCAL_INPUT_ROOT:./runtime/media-input}
+    local-output-root: ${STREAMORA_TRANSCODE_LOCAL_OUTPUT_ROOT:./runtime/media-output}
+    work-root: ${STREAMORA_TRANSCODE_WORK_ROOT:./runtime/transcode-work}

@@ -32,6 +32,7 @@
         <protobuf.version>3.25.5</protobuf.version>
         <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
         <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
+        <jaffree.version>2024.08.29</jaffree.version>
     </properties>
 
     <dependencyManagement>

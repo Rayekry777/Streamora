@@ -1,78 +1,102 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { useQuery } from '@tanstack/vue-query'
+import { ArrowRight, Play, RefreshCw } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { getHomeFeed } from '../api/videoApi'
+import CategoryNav from '../components/video/CategoryNav.vue'
+import ContentSkeleton from '../components/video/ContentSkeleton.vue'
+import VideoGrid from '../components/video/VideoGrid.vue'
+import { formatDuration, formatViews } from '../utils/formatters'
 
-const videos = [
-  { id: 'demo-1', title: '和宠物一起探索城市角落', creator: 'Streamora Studio', tone: 'violet' },
-  { id: 'demo-2', title: '三分钟做一份治愈早餐', creator: '清晨厨房', tone: 'coral' },
-  { id: 'demo-3', title: '猫咪第一次看海是什么反应', creator: '海边日记', tone: 'blue' },
-]
+const route = useRoute()
+const router = useRouter()
+const activeCategory = computed(() => typeof route.query.category === 'string' ? route.query.category : 'all')
+const featuredImageFailed = ref(false)
+const feedQuery = useQuery({
+  queryKey: ['home-feed', activeCategory],
+  queryFn: () => getHomeFeed(activeCategory.value),
+})
+
+function selectCategory(categoryId: string): void {
+  void router.push({ name: 'home', query: categoryId === 'all' ? {} : { category: categoryId } })
+}
 </script>
 
 <template>
-  <section class="hero-section">
-    <div>
-      <span class="eyebrow">VIDEO × AI COMPANION</span>
-      <h1>不只是观看，<br>让宠物陪你一起感受。</h1>
-      <p>Streamora 把视频社区与可成长的 AI 宠物连接在一起。它会理解播放情境，也会记住你允许它记住的事。</p>
-      <div class="hero-actions">
-        <RouterLink
-          class="primary-button"
-          to="/explore"
-        >
-          开始探索
-        </RouterLink>
-        <RouterLink
-          class="ghost-button"
-          to="/upload"
-        >
-          成为创作者
-        </RouterLink>
-      </div>
-    </div>
+  <section class="home-page">
+    <CategoryNav
+      v-if="feedQuery.data.value"
+      :categories="feedQuery.data.value.categories"
+      :active-category="activeCategory"
+      @select="selectCategory"
+    />
+
+    <ContentSkeleton v-if="feedQuery.isPending.value" />
+
     <div
-      class="hero-card"
-      aria-label="产品能力预览"
+      v-else-if="feedQuery.isError.value"
+      class="page-state"
+      role="alert"
     >
-      <div class="hero-card__screen">
-        <span>AI PET REACTION</span>
-        <strong>“这个转场好漂亮！”</strong>
-      </div>
-      <div class="hero-card__meta">
-        <span>规则即时反应</span>
-        <span>视频语义提示</span>
-        <span>用户可控记忆</span>
-      </div>
-    </div>
-  </section>
-
-  <section class="section-block">
-    <div class="section-heading">
-      <div>
-        <span class="eyebrow">TRENDING NOW</span>
-        <h2>今天值得一看</h2>
-      </div>
-      <RouterLink to="/explore">
-        查看全部 →
-      </RouterLink>
-    </div>
-
-    <div class="video-grid">
-      <RouterLink
-        v-for="video in videos"
-        :key="video.id"
-        class="video-card"
-        :to="`/watch/${video.id}`"
+      <strong>内容暂时无法加载</strong>
+      <span>请检查网络后重试。</span>
+      <button
+        type="button"
+        @click="feedQuery.refetch()"
       >
-        <div
-          class="video-card__cover"
-          :data-tone="video.tone"
-        >
-          <span class="video-card__duration">03:24</span>
-        </div>
-        <h3>{{ video.title }}</h3>
-        <p>{{ video.creator }} · 1.2 万次观看</p>
-      </RouterLink>
+        <RefreshCw :size="16" />
+        重试
+      </button>
     </div>
+
+    <template v-else-if="feedQuery.data.value">
+      <RouterLink
+        class="featured-video"
+        :to="{ name: 'watch', params: { videoId: feedQuery.data.value.featuredVideo.videoId } }"
+      >
+        <img
+          v-if="!featuredImageFailed"
+          :src="feedQuery.data.value.featuredVideo.coverUrl"
+          :alt="feedQuery.data.value.featuredVideo.title"
+          @error="featuredImageFailed = true"
+        >
+        <div
+          v-else
+          class="featured-video__image-fallback"
+        />
+        <div class="featured-video__overlay">
+          <span>今日焦点</span>
+          <h1>{{ feedQuery.data.value.featuredVideo.title }}</h1>
+          <p>{{ feedQuery.data.value.featuredVideo.creator.displayName }} · {{ formatViews(feedQuery.data.value.featuredVideo.viewCount) }}次观看</p>
+          <strong><Play
+            :size="17"
+            fill="currentColor"
+          /> {{ formatDuration(feedQuery.data.value.featuredVideo.durationSeconds) }}</strong>
+        </div>
+      </RouterLink>
+
+      <section class="content-section">
+        <div class="section-heading">
+          <div>
+            <p>为你精选</p>
+            <h2>{{ activeCategory === 'all' ? '正在发生的好内容' : '这个分区正在更新' }}</h2>
+          </div>
+          <RouterLink to="/explore">
+            查看分区
+            <ArrowRight :size="17" />
+          </RouterLink>
+        </div>
+        <VideoGrid :videos="feedQuery.data.value.items" />
+      </section>
+
+      <div
+        v-if="feedQuery.data.value.items.length === 0"
+        class="page-state"
+      >
+        <strong>这个分区还没有公开视频</strong>
+        <span>换一个分区看看，或者稍后再来。</span>
+      </div>
+    </template>
   </section>
 </template>
-
