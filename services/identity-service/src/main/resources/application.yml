@@ -32,6 +32,8 @@ dubbo:
   application:
     name: ${spring.application.name}
     qos-enable: false
+    # HTTP 与 Dubbo 共用应用名时仅注册接口地址，避免网关把 HTTP 流量负载到 Triple 端口。
+    register-mode: interface
   registry:
     address: N/A
   protocol:
