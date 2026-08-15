@@ -16,6 +16,7 @@ RUN --mount=type=cache,id=streamora-pnpm,target=/pnpm/store \
 
 # Vite 的公开变量只能放非敏感配置；API 在运行时由 Nginx 同源转发。
 COPY packages/ui-tokens packages/ui-tokens
+COPY packages/openapi/generated packages/openapi/generated
 COPY apps/web apps/web
 RUN pnpm --filter @streamora/web build
 
@@ -26,4 +27,3 @@ COPY --from=builder /workspace/apps/web/dist /usr/share/nginx/html
 
 HEALTHCHECK --interval=20s --timeout=3s --start-period=10s --retries=3 \
   CMD wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
-

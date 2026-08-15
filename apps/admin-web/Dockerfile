@@ -16,6 +16,7 @@ RUN --mount=type=cache,id=streamora-pnpm,target=/pnpm/store \
 
 # 管理端与用户端独立构建；敏感配置不进入 Vite 构建变量。
 COPY packages/ui-tokens packages/ui-tokens
+COPY packages/openapi/generated packages/openapi/generated
 COPY apps/admin-web apps/admin-web
 RUN pnpm --filter @streamora/admin-web build
 
@@ -26,4 +27,3 @@ COPY --from=builder /workspace/apps/admin-web/dist /usr/share/nginx/html
 
 HEALTHCHECK --interval=20s --timeout=3s --start-period=10s --retries=3 \
   CMD wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
-
