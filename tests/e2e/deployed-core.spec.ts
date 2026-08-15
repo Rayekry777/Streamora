@@ -18,6 +18,7 @@ test('用户端注册后切换个人宠物，且不能使用管理员会话', as
   await page.getByLabel('密码').fill('streamora-e2e-user-password')
   await page.getByRole('button', { name: '注册并登录' }).click()
 
+  await page.locator('summary[aria-label="打开用户菜单"]').click()
   const logoutButton = page.getByRole('button', { name: '退出登录', exact: true })
   await expect(logoutButton).toBeVisible()
   await expect(page.getByTestId('global-pet-host')).toHaveAttribute('data-pet-source', 'PERSONAL')
