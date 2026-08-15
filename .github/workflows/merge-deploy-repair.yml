@@ -16,6 +16,11 @@ jobs:
       startsWith(github.event.workflow_run.head_branch, 'deploy-repair/')
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: 通过验证后 squash 合并修复 PR
         env:
           GH_TOKEN: ${{ secrets.DEPLOY_REPAIR_GITHUB_TOKEN }}
