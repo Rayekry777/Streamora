@@ -1,0 +1,64 @@
+name: 部署 Core
+
+on:
+  workflow_run:
+    workflows: [验证]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 要部署的 Git 引用或提交 SHA
+        required: true
+        default: master
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: streamora-core-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'master')
+    runs-on: [self-hosted, linux, x64, streamora-core]
+    timeout-minutes: 75
+    steps:
+      - name: 检出已验证提交
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 确认部署提交
+        id: revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_sha="$(git rev-parse HEAD)"
+          echo "sha=$deploy_sha" >> "$GITHUB_OUTPUT"
+
+      - name: 构建并部署 Core
+        id: deploy
+        shell: bash
+        run: scripts/ci/deploy-core.sh "${{ steps.revision.outputs.sha }}"
+
+      - name: 收集失败诊断
+        if: failure()
+        shell: bash
+        run: scripts/ci/collect-deploy-diagnostics.sh "${{ steps.revision.outputs.sha }}" platform/deploy-diagnostics
+
+      - name: 上传部署诊断
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-diagnostics
+          path: platform/deploy-diagnostics
+          if-no-files-found: warn
+          retention-days: 14

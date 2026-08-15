@@ -1,0 +1,38 @@
+name: 合并部署修复
+
+on:
+  workflow_run:
+    workflows: [验证]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      startsWith(github.event.workflow_run.head_branch, 'deploy-repair/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: 通过验证后 squash 合并修复 PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_number="$(gh pr list --head "$BRANCH" --base master --state open --json number --jq '.[0].number')"
+          test -n "$pr_number"
+          pr_body="$(gh pr view "$pr_number" --json body --jq .body)"
+          root_sha="$(printf '%s\n' "$pr_body" | sed -nE 's/^Deploy-Repair-Root:[[:space:]]*([0-9a-f]{40})$/\1/p' | head -n 1)"
+          attempt="$(printf '%s\n' "$pr_body" | sed -nE 's/^Deploy-Repair-Attempt:[[:space:]]*([0-9]+)$/\1/p' | head -n 1)"
+          [[ "$root_sha" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$attempt" =~ ^[1-3]$ ]]
+          gh pr merge "$pr_number" --auto --squash --delete-branch \
+            --subject "fix(部署): 自动修复第 ${attempt} 轮" \
+            --body "Deploy-Repair-Root: ${root_sha}\nDeploy-Repair-Attempt: ${attempt}"
