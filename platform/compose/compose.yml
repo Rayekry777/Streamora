@@ -103,8 +103,10 @@ services:
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
-      # Nacos 3 镜像即使关闭鉴权也要求提供合法的 Base64 JWT 签名材料；生产环境在本机 .env 覆盖。
+      # Nacos 3 镜像即使关闭鉴权也要求提供合法的签名和节点身份材料；生产环境在本机 .env 覆盖。
       NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:-U3RyZWFtb3JhQ2xvc2VkRGVtb05hY29zVG9rZW5Gb3JMb2NhbE9ubHkyMDI2}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-streamora-core}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-closed-demo}
       NACOS_EXTENSION_AI_ENABLED: "false"
       JVM_XMS: 512m
       JVM_XMX: 512m
@@ -142,8 +144,8 @@ services:
     image: apache/rocketmq:5.3.1
     profiles: *infra-profiles
     restart: unless-stopped
-    # 当前服务使用 RocketMQ 原生客户端；Proxy 作为独立组件按需启用，避免与 Broker 共享日志目录。
-    command: ["sh", "mqbroker", "-n", "rocketmq-namesrv:9876"]
+    # 当前服务使用 RocketMQ 原生客户端；Proxy 作为独立组件按需启用。
+    command: ["sh", "-c", "mkdir -p /home/rocketmq/logs/rocketmqlogs && exec sh mqbroker -n rocketmq-namesrv:9876"]
     environment:
       NAMESRV_ADDR: rocketmq-namesrv:9876
     volumes:
@@ -153,6 +155,8 @@ services:
       - "10911"
       - "10912"
     depends_on:
+      rocketmq-volume-init:
+        condition: service_completed_successfully
       rocketmq-namesrv:
         condition: service_healthy
     healthcheck:
@@ -163,6 +167,16 @@ services:
       retries: 10
     networks:
       - streamora-app
+
+  # Docker 新建命名卷归 root 所有；仅此一次性任务以 root 修正 RocketMQ 数据卷所有权，Broker 仍以镜像内非 root 用户运行。
+  rocketmq-volume-init:
+    image: apache/rocketmq:5.3.1
+    profiles: *infra-profiles
+    user: "0:0"
+    command: ["sh", "-c", "mkdir -p /home/rocketmq/store && chown -R 3000:3000 /home/rocketmq/store"]
+    volumes:
+      - rocketmq-broker-store:/home/rocketmq/store
+    restart: "no"
 
   sentinel:
     image: bladex/sentinel-dashboard:1.8.8
