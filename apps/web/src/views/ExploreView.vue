@@ -1,20 +1,16 @@
+<script setup lang="ts">
+import { SearchX } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+const keyword = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
+</script>
+
 <template>
-  <section class="section-block page-hero">
-    <span class="eyebrow">EXPLORE</span>
-    <h1>发现感兴趣的内容</h1>
-    <p>阶段 7 将在这里接入搜索、推荐与关注流；当前页面用于确认路由和用户端布局骨架。</p>
-    <div
-      class="chip-row"
-      aria-label="内容分类"
-    >
-      <button
-        v-for="label in ['推荐', '生活', '萌宠', '科技', '游戏', '知识']"
-        :key="label"
-        type="button"
-      >
-        {{ label }}
-      </button>
-    </div>
+  <section class="explore-placeholder">
+    <SearchX :size="34" />
+    <h1>{{ keyword ? `“${keyword}” 的搜索结果` : '探索内容分区' }}</h1>
+    <p>{{ keyword ? '搜索服务将在阶段 7 接入。现在可以从首页分区继续浏览。' : '分区推荐已在首页开放；搜索和关注流将在阶段 7 接入。' }}</p>
   </section>
 </template>
-

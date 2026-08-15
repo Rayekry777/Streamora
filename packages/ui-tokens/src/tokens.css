@@ -1,19 +1,18 @@
 :root {
   color-scheme: light;
-  --streamora-canvas: #f4f7fb;
+  --streamora-canvas: #f6f7f9;
   --streamora-surface: #ffffff;
-  --streamora-ink: #14213d;
-  --streamora-muted: #60708f;
-  --streamora-border: #dce3ef;
-  --streamora-primary: #5b6cff;
-  --streamora-primary-strong: #4052ec;
-  --streamora-accent: #ff6b8a;
+  --streamora-ink: #1f2733;
+  --streamora-muted: #6c7480;
+  --streamora-border: #e2e6eb;
+  --streamora-primary: #1178b8;
+  --streamora-primary-strong: #09639a;
+  --streamora-accent: #e76073;
   --streamora-success: #22a06b;
   --streamora-danger: #d92d20;
-  --streamora-radius-sm: 10px;
-  --streamora-radius-md: 16px;
-  --streamora-radius-lg: 24px;
-  --streamora-shadow: 0 18px 50px rgb(30 48 90 / 10%);
+  --streamora-radius-sm: 4px;
+  --streamora-radius-md: 6px;
+  --streamora-radius-lg: 8px;
+  --streamora-shadow: 0 8px 24px rgb(31 39 51 / 10%);
   --streamora-font-sans: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
-
