@@ -1,0 +1,4 @@
+interface:
+  display_name: "Streamora Loop Engineering"
+  short_description: "自动驱动提交、修复、PR 与部署闭环工作流"
+  default_prompt: "Use $streamora-loop-engineering to run the Streamora delivery loop for this task."

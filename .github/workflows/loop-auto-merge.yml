@@ -1,4 +1,4 @@
-name: 合并部署修复
+name: Loop Auto Merge
 
 on:
   workflow_run:
@@ -7,16 +7,22 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+
+concurrency:
+  group: loop-auto-merge-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
 
 jobs:
   merge:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
-      startsWith(github.event.workflow_run.head_branch, 'deploy-repair/')
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      !startsWith(github.event.workflow_run.head_branch, 'deploy-repair/')
     runs-on: ubuntu-24.04
     steps:
-      - name: 通过验证后 squash 合并修复 PR
+      - name: 对最新绿色 PR 启用 squash 自动合并
         env:
           GH_TOKEN: ${{ secrets.DEPLOY_REPAIR_GITHUB_TOKEN }}
           BRANCH: ${{ github.event.workflow_run.head_branch }}
@@ -40,30 +46,28 @@ jobs:
             if ! awk -F '\t' -v required="$required_check" \
               '$1 == required && $2 == "completed" && $3 == "success" { found = 1 } END { exit !found }' \
               <<< "$checks"; then
-              echo "当前部署修复提交缺少成功的必需检查：${required_check}" >&2
+              echo "当前提交缺少成功的必需检查：${required_check}" >&2
               exit 1
             fi
           done
-          pr_body="$(gh pr view "$pr_number" --json body --jq .body)"
-          root_sha="$(printf '%s\n' "$pr_body" | sed -nE 's/^Deploy-Repair-Root:[[:space:]]*([0-9a-f]{40})$/\1/p' | head -n 1)"
-          attempt="$(printf '%s\n' "$pr_body" | sed -nE 's/^Deploy-Repair-Attempt:[[:space:]]*([0-9]+)$/\1/p' | head -n 1)"
-          [[ "$root_sha" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$attempt" =~ ^[1-4]$ ]]
-          merge_body="$(printf '%s\n' \
+          gh pr comment "$pr_number" --body "<!-- streamora-loop
+          verified_sha: ${VERIFIED_SHA}
+          status: checks-passed-auto-merge-enabled
+          -->"
+          merge_body="$(printf '%s\\n' \
             '功能明细：' \
-            '- 已通过独立修复 PR 验证的最小部署修复' \
+            '- 已通过最新 GitHub Actions 验证并自动 squash 合并' \
             '' \
             '验证结果：' \
             '- GitHub Actions 验证：通过' \
             '' \
             '未运行项：' \
-            '- 部署后浏览器联调由后续部署工作流执行' \
+            '- 部署后验证由部署工作流执行' \
             '' \
             '阶段状态：' \
-            '- 阶段 3：待验收' \
-            '' \
-            "Deploy-Repair-Root: ${root_sha}" \
-            "Deploy-Repair-Attempt: ${attempt}")"
+            '- 阶段 3：待验收')"
           gh pr merge "$pr_number" --auto --squash --delete-branch \
-            --subject "fix(部署): 自动修复第 ${attempt} 轮" \
+            --subject "$(gh pr view "$pr_number" --json title --jq .title)" \
             --body "$merge_body"
+          gh label create "agent:done" --color "0E8A16" --description "Loop Engineering 已完成" --force || true
+          gh pr edit "$pr_number" --remove-label "agent:repairing" --remove-label "agent:root-cause" --add-label "agent:done" || true
