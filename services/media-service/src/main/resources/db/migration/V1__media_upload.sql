@@ -40,7 +40,7 @@ CREATE TABLE media.outbox_event (
     id VARCHAR(36) PRIMARY KEY,
     event_type VARCHAR(120) NOT NULL,
     aggregate_id VARCHAR(36) NOT NULL,
-    payload_json CLOB NOT NULL,
+    payload_json TEXT NOT NULL,
     occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
     published_at TIMESTAMP WITH TIME ZONE
 );
