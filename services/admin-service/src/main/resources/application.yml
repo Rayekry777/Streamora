@@ -1,6 +1,15 @@
 spring:
   application:
     name: admin-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:streamora_admin;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  flyway:
+    enabled: true
+    schemas: admin
+    default-schema: admin
+    create-schemas: true
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
   lifecycle:
@@ -51,4 +60,22 @@ management:
 info:
   app:
     name: ${spring.application.name}
-    phase: foundation
+    phase: identity-rbac
+
+streamora:
+  identity:
+    rpc-enabled: ${STREAMORA_IDENTITY_RPC_ENABLED:false}
+  session:
+    secure-cookie: ${STREAMORA_SECURE_COOKIE:true}
+  bootstrap:
+    admin-subject-id: ${STREAMORA_BOOTSTRAP_ADMIN_SUBJECT_ID:}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+streamora:
+  session:
+    secure-cookie: false

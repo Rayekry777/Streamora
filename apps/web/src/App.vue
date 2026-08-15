@@ -1,6 +1,15 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { RouterLink, RouterView } from 'vue-router'
 import GlobalPetHost from './pet/GlobalPetHost.vue'
+import { useUserAuthStore } from './stores/userAuth'
+
+const auth = useUserAuthStore()
+const { busy, isAuthenticated, session } = storeToRefs(auth)
+
+async function logout(): Promise<void> {
+  await auth.logout()
+}
 </script>
 
 <template>
@@ -31,12 +40,28 @@ import GlobalPetHost from './pet/GlobalPetHost.vue'
       </nav>
 
       <div class="topbar-actions">
+        <span
+          v-if="isAuthenticated"
+          class="account-label"
+        >
+          {{ session?.displayName }}
+        </span>
         <button
+          v-if="isAuthenticated"
           class="ghost-button"
           type="button"
+          :disabled="busy"
+          @click="logout"
+        >
+          退出
+        </button>
+        <RouterLink
+          v-else
+          class="ghost-button"
+          to="/login"
         >
           登录
-        </button>
+        </RouterLink>
         <RouterLink
           class="primary-button"
           to="/upload"
@@ -53,4 +78,3 @@ import GlobalPetHost from './pet/GlobalPetHost.vue'
     <GlobalPetHost />
   </div>
 </template>
-

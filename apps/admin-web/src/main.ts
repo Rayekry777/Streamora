@@ -5,9 +5,11 @@ import '@streamora/ui-tokens/tokens.css'
 import 'uno.css'
 import App from './App.vue'
 import router from './router'
+import { useAdminAuthStore } from './stores/adminAuth'
 import './style.css'
 
 const app = createApp(App)
+const pinia = createPinia()
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -17,8 +19,10 @@ const queryClient = new QueryClient({
   },
 })
 
-app.use(createPinia())
-app.use(router)
+app.use(pinia)
 app.use(VueQueryPlugin, { queryClient })
-app.mount('#app')
 
+void useAdminAuthStore(pinia).bootstrap().finally(() => {
+  app.use(router)
+  app.mount('#app')
+})

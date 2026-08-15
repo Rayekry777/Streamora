@@ -1,5 +1,6 @@
 package com.streamora.admin;
 
+import org.apache.dubbo.config.spring.context.annotation.EnableDubbo;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -7,6 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * Streamora admin-service runtime entry point.
  */
 @SpringBootApplication
+@EnableDubbo
 public class AdminServiceApplication {
 
     /**

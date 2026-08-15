@@ -1,23 +1,24 @@
 package com.streamora.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Verifies that the service starts and exposes its liveness probe without infrastructure.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest
+@AutoConfigureMockMvc
 class IdentityServiceApplicationHealthTest {
 
-    @LocalServerPort
-    private int port;
+    @Autowired
+    private MockMvc mockMvc;
 
     /**
      * Confirms that the local profile exposes an UP liveness response.
@@ -26,15 +27,11 @@ class IdentityServiceApplicationHealthTest {
      */
     @Test
     void shouldExposeLivenessHealth() throws Exception {
-        var request = HttpRequest.newBuilder()
-                .uri(URI.create("http://127.0.0.1:" + port + "/actuator/health/liveness"))
-                .GET()
-                .build();
+        var response = mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse();
 
-        var response = HttpClient.newHttpClient()
-                .send(request, HttpResponse.BodyHandlers.ofString());
-
-        assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(response.body()).contains("\"status\":\"UP\"");
+        assertThat(response.getContentAsString()).contains("\"status\":\"UP\"");
     }
 }

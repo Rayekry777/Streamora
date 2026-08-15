@@ -20,6 +20,12 @@
             <artifactId>protobuf-java</artifactId>
             <version>${protobuf.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.dubbo</groupId>
+            <artifactId>dubbo</artifactId>
+            <version>${dubbo.version}</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -32,18 +38,20 @@
         </extensions>
         <plugins>
             <plugin>
-                <groupId>org.xolstice.maven.plugins</groupId>
-                <artifactId>protobuf-maven-plugin</artifactId>
-                <version>${protobuf-maven-plugin.version}</version>
+                <groupId>org.apache.dubbo</groupId>
+                <artifactId>dubbo-maven-plugin</artifactId>
+                <version>${dubbo.version}</version>
                 <configuration>
                     <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-                    <clearOutputDirectory>false</clearOutputDirectory>
+                    <dubboVersion>${dubbo.version}</dubboVersion>
+                    <dubboGenerateType>tri</dubboGenerateType>
+                    <protoSourceDir>${project.basedir}/src/main/proto</protoSourceDir>
+                    <outputDir>${project.build.directory}/generated-sources/protobuf/java</outputDir>
                 </configuration>
                 <executions>
                     <execution>
                         <goals>
                             <goal>compile</goal>
-                            <goal>test-compile</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -51,4 +59,3 @@
         </plugins>
     </build>
 </project>
-

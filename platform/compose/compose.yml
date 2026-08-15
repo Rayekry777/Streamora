@@ -27,6 +27,7 @@ x-backend-base: &backend-base
   mem_limit: ${BACKEND_MEMORY_LIMIT:-768m}
   networks:
     - streamora-app
+    - streamora-data
   depends_on:
     nacos:
       condition: service_healthy
@@ -38,7 +39,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: streamora
-      POSTGRES_USER: streamora_admin
+      POSTGRES_USER: streamora_platform_admin
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
       STREAMORA_SERVICE_DB_PASSWORD: ${STREAMORA_SERVICE_DB_PASSWORD:?请在 .env 中设置 STREAMORA_SERVICE_DB_PASSWORD}
     volumes:
@@ -47,7 +48,7 @@ services:
     expose:
       - "5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U streamora_admin -d streamora"]
+      test: ["CMD-SHELL", "pg_isready -U streamora_platform_admin -d streamora"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -262,6 +263,18 @@ services:
     environment:
       <<: *backend-environment
       SERVER_PORT: "8081"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/streamora?currentSchema=admin
+      SPRING_DATASOURCE_USERNAME: streamora_admin
+      SPRING_DATASOURCE_PASSWORD: ${STREAMORA_SERVICE_DB_PASSWORD:?请在 .env 中设置 STREAMORA_SERVICE_DB_PASSWORD}
+      STREAMORA_IDENTITY_RPC_ENABLED: "true"
+      STREAMORA_BOOTSTRAP_ADMIN_SUBJECT_ID: ${STREAMORA_BOOTSTRAP_ADMIN_SUBJECT_ID:-1}
+    depends_on:
+      nacos:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
     expose: ["8081"]
 
   identity-service:
@@ -275,6 +288,17 @@ services:
     environment:
       <<: *backend-environment
       SERVER_PORT: "8082"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/streamora?currentSchema=identity
+      SPRING_DATASOURCE_USERNAME: streamora_identity
+      SPRING_DATASOURCE_PASSWORD: ${STREAMORA_SERVICE_DB_PASSWORD:?请在 .env 中设置 STREAMORA_SERVICE_DB_PASSWORD}
+      STREAMORA_BOOTSTRAP_ADMIN_LOGIN: ${STREAMORA_BOOTSTRAP_ADMIN_LOGIN:-streamora-admin}
+      STREAMORA_BOOTSTRAP_ADMIN_PASSWORD: ${STREAMORA_BOOTSTRAP_ADMIN_PASSWORD:?请在 .env 中设置 STREAMORA_BOOTSTRAP_ADMIN_PASSWORD}
+      STREAMORA_BOOTSTRAP_ADMIN_DISPLAY_NAME: ${STREAMORA_BOOTSTRAP_ADMIN_DISPLAY_NAME:-Streamora Administrator}
+    depends_on:
+      nacos:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     expose: ["8082"]
 
   user-service:
@@ -418,6 +442,17 @@ services:
     environment:
       <<: *backend-environment
       SERVER_PORT: "8093"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/streamora?currentSchema=pet
+      SPRING_DATASOURCE_USERNAME: streamora_pet
+      SPRING_DATASOURCE_PASSWORD: ${STREAMORA_SERVICE_DB_PASSWORD:?请在 .env 中设置 STREAMORA_SERVICE_DB_PASSWORD}
+      STREAMORA_IDENTITY_RPC_ENABLED: "true"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
     expose: ["8093"]
 
   agent-service:
@@ -507,4 +542,3 @@ volumes:
   grafana-data:
   loki-data:
   tempo-data:
-

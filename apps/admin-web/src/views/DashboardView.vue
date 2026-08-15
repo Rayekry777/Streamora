@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query'
+import { getOperationsOverview } from '../api/operationsApi'
+
+const overview = useQuery({
+  queryKey: ['admin-operations-overview'],
+  queryFn: getOperationsOverview,
+})
+
 const metrics = [
   { label: '待审核内容', value: '—', hint: '阶段 4 接入', tone: 'violet' },
   { label: '转码任务', value: '—', hint: '阶段 3 接入', tone: 'blue' },
@@ -13,7 +21,10 @@ const metrics = [
       <div>
         <span>OVERVIEW</span>
         <h1>运营概览</h1>
-        <p>当前为管理端基础骨架，真实读模型在对应领域阶段接入。</p>
+        <p>
+          管理会话和 DASHBOARD_VIEW 权限已经接入。
+          <span v-if="overview.data.value">当前服务阶段 {{ overview.data.value.phase }} · {{ overview.data.value.status }}</span>
+        </p>
       </div>
       <button
         class="admin-primary"
@@ -59,4 +70,3 @@ const metrics = [
     </div>
   </section>
 </template>
-

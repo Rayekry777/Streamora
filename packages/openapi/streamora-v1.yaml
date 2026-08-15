@@ -2,12 +2,213 @@ openapi: 3.1.0
 info:
   title: Streamora External API
   version: 0.1.0
-  description: Streamora 用户端与管理端 HTTP 契约入口；阶段 1 先固定公共信封和分页结构。
+  description: Streamora 用户端与管理端 HTTP 契约入口；阶段 2 固定身份、RBAC 与活动宠物接口。
 servers:
   - url: /
     description: 通过同源网关访问
-paths: {}
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: 注册用户并建立用户会话
+      operationId: registerUser
+      tags: [User Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+      responses:
+        '201':
+          description: 用户创建并登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/auth/login:
+    post:
+      summary: 登录用户端
+      operationId: loginUser
+      tags: [User Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 用户登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/auth/session:
+    get:
+      summary: 获取当前用户会话
+      operationId: getUserSession
+      tags: [User Authentication]
+      security:
+        - userSession: []
+      responses:
+        '200':
+          description: 当前用户会话
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/auth/logout:
+    post:
+      summary: 注销当前用户会话
+      operationId: logoutUser
+      tags: [User Authentication]
+      security:
+        - userSession: []
+          csrfToken: []
+      responses:
+        '204':
+          description: 用户会话已撤销
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin-api/v1/auth/login:
+    post:
+      summary: 登录运营管理端
+      operationId: loginAdmin
+      tags: [Admin Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 管理员登录并完成角色装载
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin-api/v1/auth/session:
+    get:
+      summary: 获取当前管理员会话与权限
+      operationId: getAdminSession
+      tags: [Admin Authentication]
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 当前管理员会话和权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin-api/v1/auth/logout:
+    post:
+      summary: 注销当前管理员会话
+      operationId: logoutAdmin
+      tags: [Admin Authentication]
+      security:
+        - adminSession: []
+          csrfToken: []
+      responses:
+        '204':
+          description: 管理会话已撤销
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin-api/v1/operations/overview:
+    get:
+      summary: 获取受 RBAC 保护的运营概览
+      operationId: getAdminOperationsOverview
+      tags: [Admin Operations]
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 需要 DASHBOARD_VIEW 权限的阶段占位概览
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsOverviewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/pets/active:
+    get:
+      summary: 获取当前浏览器应展示的宠物
+      operationId: getActivePet
+      tags: [Pet]
+      security: []
+      description: 未登录返回公共吉祥物，用户会话有效时返回该用户个人宠物；管理员 Cookie 不参与识别。
+      responses:
+        '200':
+          description: 当前应展示的宠物
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivePetResponse'
 components:
+  securitySchemes:
+    userSession:
+      type: apiKey
+      in: cookie
+      name: STREAMORA_USER_SESSION
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: STREAMORA_ADMIN_SESSION
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  responses:
+    BadRequest:
+      description: 请求校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: 未登录、凭据错误或会话失效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: CSRF 或权限校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: 登录名已存在或请求冲突
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     ErrorDetail:
       type: object
@@ -65,4 +266,127 @@ components:
             - 'null'
         hasMore:
           type: boolean
-
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          minLength: 3
+          maxLength: 64
+        password:
+          type: string
+          minLength: 12
+          maxLength: 72
+    UserRegistrationRequest:
+      type: object
+      additionalProperties: false
+      required: [login, displayName, password]
+      properties:
+        login:
+          type: string
+          pattern: '^[a-zA-Z0-9_.-]{3,64}$'
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 40
+        password:
+          type: string
+          minLength: 12
+          maxLength: 72
+    AuthSessionView:
+      type: object
+      additionalProperties: false
+      required: [subjectId, displayName, audience, expiresAt, csrfToken]
+      properties:
+        subjectId:
+          type: string
+        displayName:
+          type: string
+        audience:
+          type: string
+          enum: [USER, ADMIN]
+        expiresAt:
+          type: string
+          format: date-time
+        csrfToken:
+          type: string
+    AuthSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/AuthSessionView'
+        requestId:
+          type: string
+    AdminSessionView:
+      allOf:
+        - $ref: '#/components/schemas/AuthSessionView'
+        - type: object
+          required: [roles, permissions]
+          properties:
+            roles:
+              type: array
+              items:
+                type: string
+                enum: [SUPER_ADMIN, CONTENT_MODERATOR, USER_OPERATOR, AI_OPERATOR, SYSTEM_OPERATOR]
+            permissions:
+              type: array
+              items:
+                type: string
+    AdminSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/AdminSessionView'
+        requestId:
+          type: string
+    ActivePetView:
+      type: object
+      additionalProperties: false
+      required: [petId, displayName, assetKey, source, ownerSubjectId]
+      properties:
+        petId:
+          type: string
+        displayName:
+          type: string
+        assetKey:
+          type: string
+        source:
+          type: string
+          enum: [PUBLIC, PERSONAL]
+        ownerSubjectId:
+          type:
+            - string
+            - 'null'
+    ActivePetResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/ActivePetView'
+        requestId:
+          type: string
+    OperationsOverviewView:
+      type: object
+      additionalProperties: false
+      required: [phase, status]
+      properties:
+        phase:
+          type: string
+        status:
+          type: string
+    OperationsOverviewResponse:
+      type: object
+      additionalProperties: false
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/OperationsOverviewView'
+        requestId:
+          type: string

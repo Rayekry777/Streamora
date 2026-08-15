@@ -91,6 +91,12 @@ a:focus-visible {
   gap: 12px;
 }
 
+.account-label {
+  color: var(--streamora-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .primary-button,
 .ghost-button {
   align-items: center;
@@ -368,6 +374,77 @@ h1 {
   font-size: 92px;
 }
 
+.auth-page {
+  display: grid;
+  min-height: calc(100vh - 220px);
+  place-items: center;
+}
+
+.auth-card {
+  background: var(--streamora-surface);
+  border: 1px solid var(--streamora-border);
+  border-radius: var(--streamora-radius-lg);
+  box-shadow: var(--streamora-shadow);
+  max-width: 520px;
+  padding: clamp(28px, 5vw, 52px);
+  width: 100%;
+}
+
+.auth-card h1 {
+  font-size: clamp(30px, 4vw, 46px);
+}
+
+.auth-card > p {
+  color: var(--streamora-muted);
+  line-height: 1.7;
+}
+
+.auth-card form,
+.auth-card label {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-card form {
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.auth-card label {
+  color: var(--streamora-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.auth-card input {
+  background: var(--streamora-canvas);
+  border: 1px solid var(--streamora-border);
+  border-radius: 12px;
+  color: var(--streamora-ink);
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.auth-submit {
+  width: 100%;
+}
+
+.auth-mode-button {
+  background: transparent;
+  border: 0;
+  color: var(--streamora-primary);
+  cursor: pointer;
+  font-weight: 700;
+  margin-top: 22px;
+  width: 100%;
+}
+
+.form-error {
+  color: #c93c54;
+  font-size: 14px;
+  margin-bottom: 0;
+}
+
 .global-pet-host {
   align-items: end;
   bottom: 28px;
@@ -406,6 +483,11 @@ h1 {
   pointer-events: auto;
   position: relative;
   width: 88px;
+}
+
+.pet-status {
+  color: var(--streamora-muted);
+  font-size: 11px;
 }
 
 .pet-ear {
@@ -490,4 +572,3 @@ h1 {
     transform: none;
   }
 }
-

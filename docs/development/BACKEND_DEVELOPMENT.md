@@ -3,16 +3,16 @@
 > 本文档是后端范围、架构、接口状态、数据演进和验证记录的维护入口。OpenAPI 是 HTTP 契约真源，Protobuf 是内部同步契约真源，Flyway 历史是已执行数据库结构真源。
 
 ```yaml
-version: 1
+version: 2
 updatedAt: 2026-08-15
 scope: Streamora 17 个后端运行单元
 reviewStatus: pending
-implementationStatus: 阶段 1 待验收
+implementationStatus: 阶段 2 待验收
 ```
 
 ## 1. 当前工程事实
 
-- 阶段 0 设计与 Skill 已完成；阶段 1 已创建 Maven 模块、17 个服务骨架、公共契约和基础设施配置，等待用户验收。
+- 阶段 0、1 已完成；阶段 2 已实现身份、管理 RBAC 和活动宠物主链路，等待用户验收。
 - 目标基线：Java 21、Spring Boot 3.5.16、Spring Cloud 2025.0.0、Spring Cloud Alibaba 2025.0.0.0。
 - 内部同步：Dubbo 3.3.6 Triple + Protobuf；异步：RocketMQ 5.3.1。
 - 服务发现与配置：Nacos 3.0.3；流量保护：Sentinel 1.8.9。
@@ -34,19 +34,23 @@ implementationStatus: 阶段 1 待验收
 
 ### 已实现
 
-无。
+- 用户注册、登录、会话读取与 CSRF 注销：`/api/v1/auth/**`。
+- 管理员登录、会话读取、CSRF 注销与 RBAC 概览：`/admin-api/v1/**`。
+- 公共/个人活动宠物选择：`/api/v1/pets/active`。
+- identity 会话内部契约：Dubbo Triple + Protobuf `IdentitySessionService`。
+- identity/admin/pet 三个服务的 Flyway V1 和 H2 PostgreSQL 兼容测试。
 
 ### 开发中
 
-无。阶段 0 只完成设计。
+- 管理端密码复验、五分钟一次性作用域令牌与刷新令牌轮换将在出现首个高风险写接口时接入；当前没有高风险管理写 API。
 
 ### 未实现
 
 | 能力 | 目标边界 | 状态 |
 |---|---|---|
-| 外部用户 API | `/api/v1`，统一响应、错误和游标分页 | 未实现 |
-| 管理 API | `/admin-api/v1`，RBAC、复验和审计 | 未实现 |
-| 内部 RPC | Dubbo Triple + Protobuf，不共享 Entity | 未实现 |
+| 外部用户 API | 其他领域 `/api/v1` API | 部分实现 |
+| 管理 API | 审核、用户治理、媒体、AI 等领域操作 | 部分实现 |
+| 内部 RPC | 后续领域 Dubbo Triple + Protobuf | 部分实现 |
 | 领域事件 | RocketMQ 事件信封、Outbox、幂等 | 未实现 |
 | Agent SSE | 8 类标准事件、断线和降级 | 未实现 |
 
@@ -60,15 +64,16 @@ implementationStatus: 阶段 1 待验收
 
 ## 5. 数据库演进
 
-当前没有业务迁移。阶段 1 已通过 PostgreSQL 容器初始化脚本为 15 个有状态服务建立独立 schema 和用户；Flyway 基线随对应领域首次建表引入，已执行迁移只增不改。
+阶段 2 已为 identity、admin、pet 建立三份 Flyway V1，共 10 张表。Compose 使用独立数据库角色和 schema；服务之间只通过 Protobuf RPC 传递主体与会话结果，不跨 schema 查询。
 
 ## 6. 实施阶段
 
 | 阶段 | 后端交付 | 状态 |
 |---|---|---|
 | 0 | 服务边界、API/事件契约、数据归属 | 已完成 |
-| 1 | 17 个运行单元、公共 BOM、配置发现和基础设施 | 待验收 |
-| 2–8 | 见 [项目路线图](../project/PROJECT_ROADMAP.md) | 未实现 |
+| 1 | 17 个运行单元、公共 BOM、配置发现和基础设施 | 已完成 |
+| 2 | 用户/管理登录、RBAC、公共宠物切换个人宠物 | 待验收 |
+| 3–8 | 见 [项目路线图](../project/PROJECT_ROADMAP.md) | 未实现 |
 
 ## 7. 验收条件
 
@@ -87,6 +92,10 @@ implementationStatus: 阶段 1 待验收
 | 2026-08-15 | 17 个运行单元 | Maven Reactor 测试、随机端口 HTTP liveness、可执行 JAR 打包 | 17/17 通过 |
 | 2026-08-15 | 依赖对齐 | 移除会覆盖 Spring 6.2 的 Dubbo 全量 BOM，仅管理 Starter 版本 | Spring Boot 3.5.16 + Dubbo 3.3.6 上下文通过 |
 | 2026-08-15 | 基础设施配置 | 5 个 YAML 解析、30 个 Compose 服务、17 个后端单元及 3 个 Profile 检查 | 静态校验通过；Docker 运行待安装后验证 |
+| 2026-08-15 | identity-service | 用户注册/会话/注销、CSRF、用户与管理员受众隔离 | 4 个测试通过 |
+| 2026-08-15 | admin-service | Strict Cookie、RBAC、权限拒绝、用户 Cookie 隔离、审计 | 4 个测试通过 |
+| 2026-08-15 | pet-service | 匿名公共宠物、管理员 Cookie 忽略、个人宠物复用 | 4 个测试通过 |
+| 2026-08-15 | 契约 | Redocly Lint、OpenAPI 类型生成、Dubbo Protobuf 代码生成 | 通过；保留 1 个阶段 1 游标组件未使用警告 |
 
 ## 9. 已确定风险
 

@@ -9,7 +9,7 @@ description: 设计、实现、修复、审查和验证 Streamora 的 Vue 3 用�
 
 1. 读取 `docs/project/PROJECT_ROADMAP.md`、当前阶段验收文件和相关 API 契约。
 2. 判断目标属于 `web`、`admin-web` 或共享契约；禁止让管理端依赖宠物运行时。
-3. 读取 [前端规范](references/frontend-standards.md)；涉及宠物时再读取全局宠物与反应事件规范；涉及管理端时读取管理端规范。
+3. 读取 [前端规范](references/frontend-standards.md)；涉及宠物时再读取 [全局宠物契约](references/global-pet-contract.md) 与 [反应事件](references/reaction-events.md)；涉及管理端时读取 [管理端规范](references/admin-frontend-standards.md)。
 4. 检查现有组件、路由、状态、测试和用户改动后再实现。
 
 ## 实现流程

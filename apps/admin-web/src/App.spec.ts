@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it } from 'vitest'
 import App from './App.vue'
@@ -12,7 +13,7 @@ describe('admin application shell', () => {
     await router.push('/')
     await router.isReady()
 
-    const wrapper = mount(App, { global: { plugins: [router] } })
+    const wrapper = mount(App, { global: { plugins: [createPinia(), router] } })
 
     expect(wrapper.get('[data-testid="admin-shell"]').attributes('data-testid')).toBe('admin-shell')
     expect(wrapper.find('[data-testid="global-pet-host"]').exists()).toBe(false)
