@@ -10,7 +10,7 @@ status: 阶段 2 身份、RBAC 与宠物实例表已实现，待用户验收
 
 ## 1. 当前结构
 
-`identity-service`、`admin-service` 和 `pet-service` 已各自引入 Flyway V1；其余领域仍处于规划状态。`platform/compose/postgres/init/001-init-streamora.sh` 只建立 pgvector 扩展、15 个独立角色和 schema，实际业务结构以各服务 Flyway 历史为真源。
+`identity-service`、`admin-service` 和 `pet-service` 已各自引入 Flyway V1；其余领域仍处于规划状态。`platform/compose/postgres/init/001-init-streamora.sh` 只建立 pgvector 扩展、15 个独立角色和 schema，并授予服务角色连接数据库及创建自身历史 schema 所需的数据库级权限；实际业务结构以各服务 Flyway 历史为真源。
 
 ## 2. 隔离规则
 

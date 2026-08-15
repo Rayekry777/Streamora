@@ -26,6 +26,7 @@ do
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'service_role', :'service_password')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'service_role') \gexec
 SELECT format('CREATE SCHEMA IF NOT EXISTS %I AUTHORIZATION %I', :'service_schema', :'service_role') \gexec
+SELECT format('GRANT CONNECT, CREATE ON DATABASE %I TO %I', current_database(), :'service_role') \gexec
 SELECT format('ALTER ROLE %I SET search_path TO %I, public', :'service_role', :'service_schema') \gexec
 EOSQL
 done

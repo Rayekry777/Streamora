@@ -33,6 +33,8 @@ x-backend-base: &backend-base
   depends_on:
     nacos:
       condition: service_healthy
+    postgres-privileges-init:
+      condition: service_completed_successfully
 
 services:
   postgres:
@@ -54,6 +56,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - streamora-data
+
+  # 兼容已初始化的数据卷：为各服务历史 Flyway 迁移所需的数据库级权限做幂等同步。
+  postgres-privileges-init:
+    image: pgvector/pgvector:0.8.1-pg16
+    profiles: *infra-profiles
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+    command: ["sh", "-c", "psql -h postgres -U streamora_platform_admin -d streamora -v ON_ERROR_STOP=1 -c 'GRANT CONNECT, CREATE ON DATABASE streamora TO streamora_identity, streamora_admin, streamora_pet'"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
     networks:
       - streamora-data
 
