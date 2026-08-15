@@ -28,7 +28,7 @@ fi
 mkdir -p "$runner_dir"
 cd "$runner_dir"
 if [[ ! -x ./config.sh ]]; then
-  runner_version="2.329.0"
+  runner_version="2.336.0"
   archive="actions-runner-linux-x64-${runner_version}.tar.gz"
   curl --fail --location --output "$archive" "https://github.com/actions/runner/releases/download/v${runner_version}/${archive}"
   tar xzf "$archive"
