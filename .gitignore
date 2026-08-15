@@ -1,0 +1,110 @@
+# Operating system
+.DS_Store
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# IDE and editor state
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+*.swp
+*.swo
+*~
+.history/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/application-local.yml
+**/application-local.yaml
+**/application-secret.yml
+**/application-secret.yaml
+**/bootstrap-local.yml
+**/bootstrap-local.yaml
+**/config/local/
+**/secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+.npmrc.local
+
+# Java and Maven outputs
+**/target/
+**/.flattened-pom.xml
+**/dependency-reduced-pom.xml
+*.class
+hs_err_pid*
+replay_pid*
+.mvn/timing.properties
+
+# Node.js, pnpm and Vite outputs
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+**/.pnpm-store/
+**/.turbo/
+**/.output/
+**/coverage/
+**/playwright-report/
+**/test-results/
+**/storybook-static/
+**/.eslintcache
+**/.stylelintcache
+**/*.tsbuildinfo
+**/vite.config.*.timestamp-*
+
+# Logs, process state and diagnostics
+**/logs/
+*.log
+*.log.*
+*.pid
+*.pid.lock
+*.stackdump
+
+# Local databases, backups and runtime state
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+/runtime/
+/tmp/
+/temp/
+/storage/
+/uploads/
+/platform/data/
+/platform/volumes/
+/platform/observability/data/
+
+# Generated media processing artifacts
+**/.transcode-cache/
+**/transcode-output/
+**/hls-output/
+**/keyframes-output/
+**/subtitle-output/
+
+# Private or separately licensed assets
+**/assets/private/
+**/assets/licensed/
+**/live2d/private/
+**/live2d/licensed/
+
+# Local Codex state; project skills in .agents/ remain tracked
+.codex/
+

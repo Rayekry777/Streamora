@@ -1,0 +1,8 @@
+interface:
+  display_name: "Streamora 交付工作流"
+  short_description: "按里程碑推进、验收并记录 Streamora 项目交付状态"
+  default_prompt: "Use $streamora-delivery-workflow to advance the next Streamora milestone and prepare its acceptance report."
+
+policy:
+  allow_implicit_invocation: false
+

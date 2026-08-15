@@ -1,0 +1,4 @@
+interface:
+  display_name: "Streamora 前端开发"
+  short_description: "实现 Streamora 用户端、管理端与全局宠物交互"
+  default_prompt: "Use $streamora-frontend-development to build the next Streamora frontend vertical slice."

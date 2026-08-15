@@ -1,0 +1,4 @@
+interface:
+  display_name: "Streamora 后端开发"
+  short_description: "实现并验证 Streamora Java 微服务与领域契约"
+  default_prompt: "Use $streamora-backend-development to implement the next Streamora backend vertical slice."
