@@ -19,7 +19,8 @@ jobs:
       root_sha: ${{ steps.attempt.outputs.root_sha }}
       attempt: ${{ steps.attempt.outputs.attempt }}
       limit_reached: ${{ steps.attempt.outputs.limit_reached }}
-      api_key_configured: ${{ steps.credentials.outputs.api_key_configured }}
+      deepseek_key_configured: ${{ steps.credentials.outputs.deepseek_key_configured }}
+      openai_key_configured: ${{ steps.credentials.outputs.openai_key_configured }}
       repair_token_configured: ${{ steps.credentials.outputs.repair_token_configured }}
     steps:
       - uses: actions/checkout@v5
@@ -59,15 +60,21 @@ jobs:
       - name: 检查自动修复凭据
         id: credentials
         env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DEPLOY_REPAIR_GITHUB_TOKEN: ${{ secrets.DEPLOY_REPAIR_GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "$OPENAI_API_KEY" ]]; then
-            echo "api_key_configured=true" >> "$GITHUB_OUTPUT"
+          if [[ -n "$DEEPSEEK_API_KEY" ]]; then
+            echo "deepseek_key_configured=true" >> "$GITHUB_OUTPUT"
           else
-            echo "api_key_configured=false" >> "$GITHUB_OUTPUT"
+            echo "deepseek_key_configured=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -n "$OPENAI_API_KEY" ]]; then
+            echo "openai_key_configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "openai_key_configured=false" >> "$GITHUB_OUTPUT"
           fi
           if [[ -n "$DEPLOY_REPAIR_GITHUB_TOKEN" ]]; then
             echo "repair_token_configured=true" >> "$GITHUB_OUTPUT"
@@ -104,11 +111,12 @@ jobs:
             --title "部署自动修复达到上限: ${ROOT_SHA:0:12}" \
             --body "Core 部署已连续失败 ${ATTEMPT} 轮，自动修改已停止。请查看失败部署与 deploy-diagnostics artifact：${DEPLOY_RUN}"
 
-  report-missing-api-key:
+  report-missing-model-key:
     needs: prepare
     if: >-
       needs.prepare.outputs.limit_reached == 'false' &&
-      needs.prepare.outputs.api_key_configured != 'true'
+      ((needs.prepare.outputs.attempt <= 3 && needs.prepare.outputs.deepseek_key_configured != 'true') ||
+       (needs.prepare.outputs.attempt == 4 && needs.prepare.outputs.openai_key_configured != 'true'))
     runs-on: ubuntu-24.04
     permissions:
       issues: write
@@ -117,6 +125,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ROOT_SHA: ${{ needs.prepare.outputs.root_sha }}
+          ATTEMPT: ${{ needs.prepare.outputs.attempt }}
           DEPLOY_RUN: ${{ github.event.workflow_run.html_url }}
         shell: bash
         run: |
@@ -126,15 +135,21 @@ jobs:
           if [[ -n "$existing" ]]; then
             exit 0
           fi
+          if (( ATTEMPT <= 3 )); then
+            missing_secret="DEEPSEEK_API_KEY（前三轮最小补丁）"
+          else
+            missing_secret="OPENAI_API_KEY（第四轮 Codex 根因修复）"
+          fi
           gh issue create \
             --title "$title" \
-            --body "部署失败后未启动 Codex 最小修复，因为仓库 Actions secrets 缺少 OPENAI_API_KEY。请在 Settings -> Secrets and variables -> Actions 添加该 Secret，然后重新运行失败的部署。失败部署：${DEPLOY_RUN}"
+            --body "部署失败后未启动自动修复，因为仓库 Actions secrets 缺少 ${missing_secret}。请在 Settings -> Secrets and variables -> Actions 添加该 Secret，然后重新运行失败的部署。失败部署：${DEPLOY_RUN}"
 
   report-missing-repair-token:
     needs: prepare
     if: >-
       needs.prepare.outputs.limit_reached == 'false' &&
-      needs.prepare.outputs.api_key_configured == 'true' &&
+      ((needs.prepare.outputs.attempt <= 3 && needs.prepare.outputs.deepseek_key_configured == 'true') ||
+       (needs.prepare.outputs.attempt == 4 && needs.prepare.outputs.openai_key_configured == 'true')) &&
       needs.prepare.outputs.repair_token_configured != 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -155,14 +170,14 @@ jobs:
           fi
           gh issue create \
             --title "$title" \
-            --body "部署失败后未启动 Codex 最小修复，因为仓库 Actions secrets 缺少 DEPLOY_REPAIR_GITHUB_TOKEN。该专用账号的细粒度 PAT 必须具备 Contents: Read and write、Pull requests: Read and write、Issues: Read and write、Checks: Read 权限；它用于推送修复分支、创建和合并 PR、更新循环标签和查询当前检查状态，以触发后续验证和部署。添加后请重新运行失败的部署：${DEPLOY_RUN}"
+            --body "部署失败后未启动 DeepSeek 最小修复，因为仓库 Actions secrets 缺少 DEPLOY_REPAIR_GITHUB_TOKEN。该专用账号的细粒度 PAT 必须具备 Contents: Read and write、Pull requests: Read and write、Issues: Read and write、Checks: Read 权限；它用于推送修复分支、创建和合并 PR、更新循环标签和查询当前检查状态，以触发后续验证和部署。添加后请重新运行失败的部署：${DEPLOY_RUN}"
 
   generate-patch:
     needs: prepare
     if: >-
       needs.prepare.outputs.limit_reached == 'false' &&
       needs.prepare.outputs.attempt <= 3 &&
-      needs.prepare.outputs.api_key_configured == 'true' &&
+      needs.prepare.outputs.deepseek_key_configured == 'true' &&
       needs.prepare.outputs.repair_token_configured == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -181,33 +196,34 @@ jobs:
           name: repair-input-${{ github.event.workflow_run.id }}
           path: deploy-diagnostics
 
-      - name: 生成最小修复补丁
-        id: codex
-        uses: openai/codex-action@v1
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt: >-
-            Read .github/codex/prompts/deploy-repair.md and deploy-diagnostics/.
-            Repair deployment failure for root ${{ needs.prepare.outputs.root_sha }},
-            attempt ${{ needs.prepare.outputs.attempt }}. Make the smallest valid code
-            changes, then stop. Do not commit, push, access secrets, or change prohibited files.
-          output-file: codex-repair-report.md
+      - name: 由 DeepSeek 生成最小修复补丁
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_REPAIR_MODEL: ${{ vars.DEEPSEEK_REPAIR_MODEL || 'deepseek-chat' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/ci/deepseek-patch-agent.mjs \
+            --instruction .github/codex/prompts/deploy-repair.md \
+            --diagnostics deploy-diagnostics \
+            --mode deployment-minimal \
+            --patch repair.patch \
+            --report deepseek-repair-report.md
 
       - name: 导出并校验补丁
         shell: bash
         run: |
           set -euo pipefail
-          git add -N -- .
+          git apply --check repair.patch
+          git apply repair.patch
           scripts/ci/validate-repair-patch.sh
-          git diff --binary -- . ':!codex-repair-report.md' > repair.patch
-          test -s repair.patch
 
       - uses: actions/upload-artifact@v4
         with:
           name: repair-patch-${{ github.event.workflow_run.id }}
           path: |
             repair.patch
-            codex-repair-report.md
+            deepseek-repair-report.md
           retention-days: 14
 
   generate-root-cause-patch:
@@ -215,7 +231,7 @@ jobs:
     if: >-
       needs.prepare.outputs.limit_reached == 'false' &&
       needs.prepare.outputs.attempt == 4 &&
-      needs.prepare.outputs.api_key_configured == 'true' &&
+      needs.prepare.outputs.openai_key_configured == 'true' &&
       needs.prepare.outputs.repair_token_configured == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -234,14 +250,15 @@ jobs:
           name: repair-input-${{ github.event.workflow_run.id }}
           path: deploy-diagnostics
 
-      - name: 由 Codex 根因 Agent 生成第四轮修复补丁
+      - name: 由 Codex 根因 Agent 生成第四轮修复
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt: >-
             Read .github/codex/prompts/deploy-root-cause-repair.md and deploy-diagnostics/.
-            This is root-cause attempt 4 for deployment root ${{ needs.prepare.outputs.root_sha }}.
-            Make the smallest safe repair, then stop. Do not commit or push.
+            This is root-cause deployment repair attempt 4 for root
+            ${{ needs.prepare.outputs.root_sha }}. Make only the smallest permitted repair.
+            Do not commit, push, access secrets, or change prohibited files.
           output-file: codex-repair-report.md
 
       - name: 导出并校验根因修复补丁
@@ -249,8 +266,9 @@ jobs:
         run: |
           set -euo pipefail
           git add -N -- .
+          git diff --check
           scripts/ci/validate-repair-patch.sh
-          git diff --binary -- . ':!codex-repair-report.md' > repair.patch
+          git diff --binary -- . ':!deploy-diagnostics' ':!codex-repair-report.md' > repair.patch
           test -s repair.patch
 
       - uses: actions/upload-artifact@v4
@@ -378,7 +396,7 @@ jobs:
           Deploy-Repair-Root: ${ROOT_SHA}
           Deploy-Repair-Attempt: ${ATTEMPT}
 
-          - 部署诊断与 Codex 修复报告会作为工作流 Artifact 保留。
+          - 部署诊断与本轮修复报告会作为工作流 Artifact 保留。
 
           ## 阶段状态
 
