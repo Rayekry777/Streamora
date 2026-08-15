@@ -3,9 +3,9 @@
 ```yaml
 version: 2
 updatedAt: 2026-08-15
-currentMigrationVersion: identity/admin/pet V1
-implementedTables: 10
-status: 阶段 2 身份、RBAC 与宠物实例表已实现，待用户验收
+currentMigrationVersion: identity/admin/pet/media V1
+implementedTables: 14
+status: 阶段 2 身份、RBAC 与宠物实例表已完成；阶段 3 媒体上传会话、转码任务与 Outbox 已实现
 ```
 
 ## 1. 当前结构
@@ -50,8 +50,9 @@ status: 阶段 2 身份、RBAC 与宠物实例表已实现，待用户验收
 
 | 迁移 | 所属服务 | 内容 | 状态 |
 |---|---|---|---|
-| `V1__identity_auth.sql` | identity-service | 账户、BCrypt 凭据、用户会话和管理员会话物理分表 | 已实现，待验收 |
-| `V1__admin_rbac.sql` | admin-service | 五个角色、七项权限、角色映射、主体授权和只追加审计 | 已实现，待验收 |
-| `V1__pet_instance.sql` | pet-service | 每用户唯一的个人宠物实例 | 已实现，待验收 |
+| `V1__identity_auth.sql` | identity-service | 账户、BCrypt 凭据、用户会话和管理员会话物理分表 | 已完成 |
+| `V1__admin_rbac.sql` | admin-service | 五个角色、七项权限、角色映射、主体授权和只追加审计 | 已完成 |
+| `V1__pet_instance.sql` | pet-service | 每用户唯一的个人宠物实例 | 已完成 |
+| `V1__media_upload.sql` | media-service | 原始媒体资产、分片上传会话、转码任务和 Outbox | 已实现，待阶段 3 验收 |
 
 容器初始化脚本不属于业务迁移历史，只负责空环境的角色、schema 和扩展准备。生产环境不得用它替代版本化 Flyway 迁移。H2 PostgreSQL 兼容模式已经验证三份迁移；真实 PostgreSQL 容器验证因当前机器未安装 Docker 待补。

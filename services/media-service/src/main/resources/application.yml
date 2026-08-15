@@ -1,6 +1,15 @@
 spring:
   application:
     name: media-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:streamora_media;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  flyway:
+    enabled: true
+    schemas: media
+    default-schema: media
+    create-schemas: true
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
   lifecycle:
@@ -51,4 +60,14 @@ management:
 info:
   app:
     name: ${spring.application.name}
-    phase: foundation
+    phase: media-upload
+
+streamora:
+  identity:
+    rpc-enabled: ${STREAMORA_IDENTITY_RPC_ENABLED:false}
+  media:
+    object-store:
+      mode: ${STREAMORA_MEDIA_OBJECT_STORE_MODE:memory}
+    upload:
+      part-size-bytes: ${STREAMORA_MEDIA_PART_SIZE_BYTES:8388608}
+      url-ttl-seconds: ${STREAMORA_MEDIA_URL_TTL_SECONDS:900}

@@ -160,6 +160,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 创建分片上传会话 */
+        post: operations["createMediaUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/uploads/{uploadId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 完成分片上传并创建转码任务 */
+        post: operations["completeMediaUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/home/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取首页视频内容流 */
+        get: operations["getHomeFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/{videoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取公开视频详情 */
+        get: operations["getVideoDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/videos/{videoId}/playback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取视频播放清单 */
+        get: operations["getVideoPlayback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -230,6 +315,129 @@ export interface components {
             data: components["schemas"]["ActivePetView"];
             requestId: string;
         };
+        CreateMediaUploadRequest: {
+            fileName: string;
+            contentType: string;
+            totalBytes: number;
+        };
+        UploadPartUrlView: {
+            partNumber: number;
+            /** Format: uri */
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        MediaUploadSessionView: {
+            uploadId: string;
+            assetId: string;
+            partSizeBytes: number;
+            /** Format: date-time */
+            expiresAt: string;
+            parts: components["schemas"]["UploadPartUrlView"][];
+        };
+        MediaUploadSessionResponse: {
+            data: components["schemas"]["MediaUploadSessionView"];
+            requestId: string;
+        };
+        CompletedUploadPartRequest: {
+            partNumber: number;
+            etag: string;
+        };
+        CompleteMediaUploadRequest: {
+            parts: components["schemas"]["CompletedUploadPartRequest"][];
+        };
+        MediaUploadCompletionView: {
+            uploadId: string;
+            assetId: string;
+            transcodeJobId: string;
+            /** @enum {string} */
+            status: "TRANSCODE_PENDING" | "TRANSCODING" | "COMPLETED" | "FAILED";
+        };
+        MediaUploadCompletionResponse: {
+            data: components["schemas"]["MediaUploadCompletionView"];
+            requestId: string;
+        };
+        CreatorSummaryView: {
+            creatorId: string;
+            displayName: string;
+            /** Format: uri */
+            avatarUrl: string;
+        };
+        VideoCardView: {
+            videoId: string;
+            title: string;
+            /** Format: uri */
+            coverUrl: string;
+            durationSeconds: number;
+            creator: components["schemas"]["CreatorSummaryView"];
+            viewCount: string;
+            /** Format: date-time */
+            publishedAt: string;
+            category: string;
+            recommendationReason: string | null;
+        };
+        VideoCategoryView: {
+            categoryId: string;
+            label: string;
+            icon?: string | null;
+        };
+        HomeFeedView: {
+            featuredVideo: components["schemas"]["VideoCardView"];
+            categories: components["schemas"]["VideoCategoryView"][];
+            items: components["schemas"]["VideoCardView"][];
+            nextCursor: string | null;
+            hasMore: boolean;
+        };
+        HomeFeedResponse: {
+            data: components["schemas"]["HomeFeedView"];
+            requestId: string;
+        };
+        VideoEpisodeView: {
+            episodeId: string;
+            title: string;
+            durationSeconds: number;
+            isCurrent: boolean;
+        };
+        VideoDetailView: {
+            videoId: string;
+            title: string;
+            description: string;
+            /** Format: uri */
+            coverUrl: string;
+            durationSeconds: number;
+            creator: components["schemas"]["CreatorSummaryView"];
+            viewCount: string;
+            /** Format: date-time */
+            publishedAt: string;
+            category: string;
+            tags: string[];
+            episodes: components["schemas"]["VideoEpisodeView"][];
+            recommendedVideos: components["schemas"]["VideoCardView"][];
+        };
+        VideoDetailResponse: {
+            data: components["schemas"]["VideoDetailView"];
+            requestId: string;
+        };
+        SubtitleTrackView: {
+            language: string;
+            label: string;
+            /** Format: uri */
+            url: string;
+        };
+        VideoPlaybackView: {
+            videoId: string;
+            /** Format: uri */
+            manifestUrl: string;
+            /** Format: uri */
+            posterUrl: string;
+            subtitles: components["schemas"]["SubtitleTrackView"][];
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        VideoPlaybackResponse: {
+            data: components["schemas"]["VideoPlaybackView"];
+            requestId: string;
+        };
         OperationsOverviewView: {
             phase: string;
             status: string;
@@ -276,8 +484,21 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
+        /** @description 资源不存在或不可访问 */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
     };
-    parameters: never;
+    parameters: {
+        VideoId: string;
+        UploadId: string;
+        IdempotencyKey: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -484,6 +705,137 @@ export interface operations {
                     "application/json": components["schemas"]["ActivePetResponse"];
                 };
             };
+        };
+    };
+    createMediaUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMediaUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建或按幂等键返回已有上传会话 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaUploadSessionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    completeMediaUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                uploadId: components["parameters"]["UploadId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteMediaUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description 原始资产已登记，转码任务已创建或已存在 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaUploadCompletionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getHomeFeed: {
+        parameters: {
+            query?: {
+                category?: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 首页焦点位、分类和游标视频流 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeFeedResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    getVideoDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: components["parameters"]["VideoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 视频详情、分集和相关推荐 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoDetailResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getVideoPlayback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                videoId: components["parameters"]["VideoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description HLS 播放清单与字幕轨道 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoPlaybackResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
 }

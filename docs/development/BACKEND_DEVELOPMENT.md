@@ -4,21 +4,22 @@
 
 ```yaml
 version: 2
-updatedAt: 2026-08-15
+updatedAt: 2026-08-16
 scope: Streamora 17 个后端运行单元
 reviewStatus: pending
-implementationStatus: 阶段 2 待验收
+implementationStatus: 阶段 2 已完成；阶段 3 进行中，视频读取契约已预置
 ```
 
 ## 1. 当前工程事实
 
-- 阶段 0、1 已完成；阶段 2 已实现身份、管理 RBAC 和活动宠物主链路，等待用户验收。
+- 阶段 0、1、2 已完成；阶段 3 已进入上传、转码、审核、发布与播放主链路实施。
 - 目标基线：Java 21、Spring Boot 3.5.16、Spring Cloud 2025.0.0、Spring Cloud Alibaba 2025.0.0.0。
 - 内部同步：Dubbo 3.3.6 Triple + Protobuf；异步：RocketMQ 5.3.1。
 - 服务发现与配置：Nacos 3.0.3；流量保护：Sentinel 1.8.9。
 - 数据：PostgreSQL + pgvector、Redis、MinIO；媒体处理：FFmpeg HLS。
 - AI：Spring AI Alibaba Agent Framework，Qwen Responses Provider 和 Mock Provider；业务层通过 `ModelProvider`、`AgentRuntime` 隔离框架。
 - 可观测性：OpenTelemetry、Prometheus、Grafana、Loki、Tempo。
+- 所有新方案先遵循 [开源方案优先政策](OPEN_SOURCE_ADOPTION_POLICY.md) 完成调研、评估与记录；无可采纳方案才允许自研。
 
 ## 2. 架构与数据流
 
@@ -39,6 +40,8 @@ implementationStatus: 阶段 2 待验收
 - 公共/个人活动宠物选择：`/api/v1/pets/active`。
 - identity 会话内部契约：Dubbo Triple + Protobuf `IdentitySessionService`。
 - identity/admin/pet 三个服务的 Flyway V1 和 H2 PostgreSQL 兼容测试。
+- 阶段 3 视频读取 OpenAPI：`/api/v1/home/feed`、`/api/v1/videos/{videoId}`、`/api/v1/videos/{videoId}/playback`；仅完成契约与生成类型，尚未由 feed、video、playback 服务实现。
+- 阶段 3 媒体上传 OpenAPI：`POST /api/v1/media/uploads`、`POST /api/v1/media/uploads/{uploadId}/complete`；media-service 已实现本地可测试的上传会话、幂等完成、转码任务和 Outbox，真实 S3 与 Identity RPC 适配待补齐。
 
 ### 开发中
 
@@ -72,8 +75,9 @@ implementationStatus: 阶段 2 待验收
 |---|---|---|
 | 0 | 服务边界、API/事件契约、数据归属 | 已完成 |
 | 1 | 17 个运行单元、公共 BOM、配置发现和基础设施 | 已完成 |
-| 2 | 用户/管理登录、RBAC、公共宠物切换个人宠物 | 待验收 |
-| 3–8 | 见 [项目路线图](../project/PROJECT_ROADMAP.md) | 未实现 |
+| 2 | 用户/管理登录、RBAC、公共宠物切换个人宠物 | 已完成 |
+| 3 | 分片上传、转码、审核、HLS 播放与媒体管理 | 进行中 |
+| 4–8 | 见 [项目路线图](../project/PROJECT_ROADMAP.md) | 未实现 |
 
 ## 7. 验收条件
 
@@ -97,6 +101,8 @@ implementationStatus: 阶段 2 待验收
 | 2026-08-15 | pet-service | 匿名公共宠物、管理员 Cookie 忽略、个人宠物复用 | 4 个测试通过 |
 | 2026-08-15 | 契约 | Redocly Lint、OpenAPI 类型生成、Dubbo Protobuf 代码生成 | 通过；保留 1 个阶段 1 游标组件未使用警告 |
 | 2026-08-15 | 封闭演示管理员登录 | `admin / 123456` 的管理端请求校验与 admin-service 集成测试 | 通过；生产环境必须改用强密码 |
+| 2026-08-16 | 阶段 3 开源方案与上传契约 | 官方资料、源仓库与许可证调研；OpenAPI lint 与 TypeScript 生成 | AWS SDK for Java 2.x + SeaweedFS + FFmpeg 进入实现基线；上传契约校验通过，保留既有未使用组件警告 |
+| 2026-08-16 | media-service 上传主链路 | H2 PostgreSQL 兼容模式下的 Flyway、幂等会话、完成、转码任务和 Outbox 集成测试 | 通过；真实 S3、Identity RPC、RocketMQ 与 FFmpeg 集成待 Docker 环境补充 |
 
 ## 9. 已确定风险
 
