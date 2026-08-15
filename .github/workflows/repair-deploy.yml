@@ -19,6 +19,8 @@ jobs:
       root_sha: ${{ steps.attempt.outputs.root_sha }}
       attempt: ${{ steps.attempt.outputs.attempt }}
       limit_reached: ${{ steps.attempt.outputs.limit_reached }}
+      api_key_configured: ${{ steps.credentials.outputs.api_key_configured }}
+      repair_token_configured: ${{ steps.credentials.outputs.repair_token_configured }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -48,10 +50,29 @@ jobs:
           attempt=$((previous_attempts + 1))
           echo "root_sha=$root_sha" >> "$GITHUB_OUTPUT"
           echo "attempt=$attempt" >> "$GITHUB_OUTPUT"
-          if (( attempt > 3 )); then
+          if (( attempt > 4 )); then
             echo "limit_reached=true" >> "$GITHUB_OUTPUT"
           else
             echo "limit_reached=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 检查自动修复凭据
+        id: credentials
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEPLOY_REPAIR_GITHUB_TOKEN: ${{ secrets.DEPLOY_REPAIR_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$OPENAI_API_KEY" ]]; then
+            echo "api_key_configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api_key_configured=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ -n "$DEPLOY_REPAIR_GITHUB_TOKEN" ]]; then
+            echo "repair_token_configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "repair_token_configured=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 上传诊断给修复任务
@@ -83,9 +104,66 @@ jobs:
             --title "部署自动修复达到上限: ${ROOT_SHA:0:12}" \
             --body "Core 部署已连续失败 ${ATTEMPT} 轮，自动修改已停止。请查看失败部署与 deploy-diagnostics artifact：${DEPLOY_RUN}"
 
+  report-missing-api-key:
+    needs: prepare
+    if: >-
+      needs.prepare.outputs.limit_reached == 'false' &&
+      needs.prepare.outputs.api_key_configured != 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: 创建自动修复配置诊断 Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOT_SHA: ${{ needs.prepare.outputs.root_sha }}
+          DEPLOY_RUN: ${{ github.event.workflow_run.html_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="部署自动修复未启用: ${ROOT_SHA:0:12}"
+          existing="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')"
+          if [[ -n "$existing" ]]; then
+            exit 0
+          fi
+          gh issue create \
+            --title "$title" \
+            --body "部署失败后未启动 Codex 最小修复，因为仓库 Actions secrets 缺少 OPENAI_API_KEY。请在 Settings -> Secrets and variables -> Actions 添加该 Secret，然后重新运行失败的部署。失败部署：${DEPLOY_RUN}"
+
+  report-missing-repair-token:
+    needs: prepare
+    if: >-
+      needs.prepare.outputs.limit_reached == 'false' &&
+      needs.prepare.outputs.api_key_configured == 'true' &&
+      needs.prepare.outputs.repair_token_configured != 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: 创建修复分支令牌配置诊断 Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOT_SHA: ${{ needs.prepare.outputs.root_sha }}
+          DEPLOY_RUN: ${{ github.event.workflow_run.html_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="部署自动修复未启用: ${ROOT_SHA:0:12}"
+          existing="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')"
+          if [[ -n "$existing" ]]; then
+            exit 0
+          fi
+          gh issue create \
+            --title "$title" \
+            --body "部署失败后未启动 Codex 最小修复，因为仓库 Actions secrets 缺少 DEPLOY_REPAIR_GITHUB_TOKEN。该专用账号的细粒度 PAT 必须具备 Contents: Read and write、Pull requests: Read and write 权限。它用于推送修复分支、创建修复 PR 和合并已验证 PR，以触发后续验证和部署。添加后请重新运行失败的部署：${DEPLOY_RUN}"
+
   generate-patch:
     needs: prepare
-    if: needs.prepare.outputs.limit_reached == 'false'
+    if: >-
+      needs.prepare.outputs.limit_reached == 'false' &&
+      needs.prepare.outputs.attempt <= 3 &&
+      needs.prepare.outputs.api_key_configured == 'true' &&
+      needs.prepare.outputs.repair_token_configured == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -121,7 +199,58 @@ jobs:
           set -euo pipefail
           git add -N -- .
           scripts/ci/validate-repair-patch.sh
-          git diff --binary -- . > repair.patch
+          git diff --binary -- . ':!codex-repair-report.md' > repair.patch
+          test -s repair.patch
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repair-patch-${{ github.event.workflow_run.id }}
+          path: |
+            repair.patch
+            codex-repair-report.md
+          retention-days: 14
+
+  generate-root-cause-patch:
+    needs: prepare
+    if: >-
+      needs.prepare.outputs.limit_reached == 'false' &&
+      needs.prepare.outputs.attempt == 4 &&
+      needs.prepare.outputs.api_key_configured == 'true' &&
+      needs.prepare.outputs.repair_token_configured == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: repair-input-${{ github.event.workflow_run.id }}
+          path: deploy-diagnostics
+
+      - name: 由 Codex 根因 Agent 生成第四轮修复补丁
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: >-
+            Read .github/codex/prompts/deploy-root-cause-repair.md and deploy-diagnostics/.
+            This is root-cause attempt 4 for deployment root ${{ needs.prepare.outputs.root_sha }}.
+            Make the smallest safe repair, then stop. Do not commit or push.
+          output-file: codex-repair-report.md
+
+      - name: 导出并校验根因修复补丁
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -N -- .
+          scripts/ci/validate-repair-patch.sh
+          git diff --binary -- . ':!codex-repair-report.md' > repair.patch
           test -s repair.patch
 
       - uses: actions/upload-artifact@v4
@@ -133,17 +262,17 @@ jobs:
           retention-days: 14
 
   create-pr:
-    needs: [prepare, generate-patch]
-    if: needs.generate-patch.result == 'success'
+    needs: [prepare, generate-patch, generate-root-cause-patch]
+    if: >-
+      always() &&
+      (needs.generate-patch.result == 'success' || needs.generate-root-cause-patch.result == 'success')
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v5
         with:
           ref: master
           fetch-depth: 0
+          token: ${{ secrets.DEPLOY_REPAIR_GITHUB_TOKEN }}
 
       - uses: actions/download-artifact@v5
         with:
@@ -166,23 +295,97 @@ jobs:
           git config user.name "streamora-deploy-repair[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "fix(部署): 自动修复第 ${ATTEMPT} 轮" \
-            -m "Deploy-Repair-Root: $ROOT_SHA" \
-            -m "Deploy-Repair-Attempt: $ATTEMPT"
+          git reset -- repair-output || true
+          git commit -F - <<EOF
+          fix(部署): 自动修复第 ${ATTEMPT} 轮
+
+          功能明细：
+          - 根据部署诊断生成并应用最小修复补丁
+          - 补丁仅通过独立 deploy-repair 分支与修复 PR 提交
+
+          验证结果：
+          - scripts/ci/validate-repair-patch.sh：通过
+
+          未运行项：
+          - 完整部署验证由修复 PR 的 GitHub Actions 执行
+
+          阶段状态：
+          - 阶段 3：待验收
+
+          Deploy-Repair-Root: $ROOT_SHA
+          Deploy-Repair-Attempt: $ATTEMPT
+          Streamora-Loop-Id: deploy-${ROOT_SHA:0:12}
+          Streamora-Loop-Root: $ROOT_SHA
+          Streamora-Loop-Attempt: $ATTEMPT
+          Streamora-Loop-Mode: $(if (( ATTEMPT == 4 )); then printf 'root-cause'; else printf 'deploy-repair'; fi)
+          EOF
           git push --set-upstream origin "$branch"
           echo "name=$branch" >> "$GITHUB_OUTPUT"
 
       - name: 创建修复 PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.DEPLOY_REPAIR_GITHUB_TOKEN }}
           ROOT_SHA: ${{ needs.prepare.outputs.root_sha }}
           ATTEMPT: ${{ needs.prepare.outputs.attempt }}
           BRANCH: ${{ steps.branch.outputs.name }}
         shell: bash
         run: |
           set -euo pipefail
+          mode="deploy-repair"
+          if (( ATTEMPT == 4 )); then
+            mode="root-cause"
+          fi
+          body_file="$(mktemp)"
+          cat > "$body_file" <<EOF
+          ## 变更目的
+
+          自动修复 Core 部署失败的第 ${ATTEMPT} 轮。
+
+          ## 功能明细
+
+          - 根据部署诊断应用可验证修复补丁
+
+          ## 接口、数据与迁移影响
+
+          - 无；补丁校验禁止自动修改数据库迁移。
+
+          ## 验证结果
+
+          - scripts/ci/validate-repair-patch.sh：通过
+          - GitHub Actions 验证：待执行
+
+          ## 未运行项
+
+          - 完整部署和浏览器联调由修复 PR 合并后的部署工作流执行
+
+          ## 风险与回滚
+
+          - 风险：修复严格限制在当前部署失败根因。
+          - 回滚方式：关闭 PR 或 revert squash 合并提交。
+
+          ## Loop 证据
+
+          <!-- streamora-loop
+          loop_id: deploy-${ROOT_SHA:0:12}
+          root_commit: ${ROOT_SHA}
+          branch_decision: 从受保护的 master 创建 ${BRANCH}
+          attempt: ${ATTEMPT}
+          mode: ${mode}
+          source: 部署失败
+          diagnostics: ${{ github.event.workflow_run.html_url }}
+          -->
+
+          Deploy-Repair-Root: ${ROOT_SHA}
+          Deploy-Repair-Attempt: ${ATTEMPT}
+
+          - 部署诊断与 Codex 修复报告会作为工作流 Artifact 保留。
+
+          ## 阶段状态
+
+          - 阶段 3：待验收
+          EOF
           pr_url="$(gh pr create \
             --base master \
             --head "$BRANCH" \
             --title "fix(部署): 自动修复第 ${ATTEMPT} 轮" \
-            --body "自动部署修复。验证通过后将 squash 合并。\n\nDeploy-Repair-Root: ${ROOT_SHA}\nDeploy-Repair-Attempt: ${ATTEMPT}")"
+            --body-file "$body_file")"

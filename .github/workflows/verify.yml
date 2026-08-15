@@ -10,12 +10,58 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  loop-governance:
+    name: Loop 治理
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: 安装治理依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 校验 GitHub Actions 与 Shell
+        uses: rhysd/actionlint@v1
+        with:
+          shellcheck: true
+
+      - name: 校验提交与 PR 交付模板
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.base_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$BASE_REF":"refs/remotes/origin/$BASE_REF"
+          base_sha="$(git merge-base "origin/$BASE_REF" HEAD)"
+          gh pr view "$PR_NUMBER" --json body --jq .body > pr-body.md
+          metadata_args=(--from "$base_sha" --to HEAD --pr-body pr-body.md)
+          case "$HEAD_BRANCH" in
+            agent/*|deploy-repair/*) metadata_args+=(--require-loop-trailers) ;;
+          esac
+          pnpm git:metadata "${metadata_args[@]}"
+
   frontend:
     name: 前端与 OpenAPI
     runs-on: ubuntu-24.04
@@ -50,6 +96,28 @@ jobs:
       - name: 前端构建
         run: pnpm build
 
+      - name: 收集前端诊断
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p loop-diagnostics/frontend
+          printf 'workflow=%s\njob=%s\nsha=%s\n' "$GITHUB_WORKFLOW" "$GITHUB_JOB" "$GITHUB_SHA" > loop-diagnostics/frontend/context.txt
+          for path in test-results playwright-report packages/web/test-results packages/admin-web/test-results; do
+            if [[ -e "$path" ]]; then
+              cp -R "$path" loop-diagnostics/frontend/"$(basename "$path")"
+            fi
+          done
+
+      - name: 上传前端诊断
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-frontend-diagnostics
+          path: loop-diagnostics/frontend
+          if-no-files-found: warn
+          retention-days: 14
+
   backend:
     name: 后端 Maven 测试
     runs-on: ubuntu-24.04
@@ -64,3 +132,25 @@ jobs:
 
       - name: Maven 全量测试
         run: bash ./mvnw -B -ntp verify
+
+      - name: 收集后端诊断
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p loop-diagnostics/backend
+          printf 'workflow=%s\njob=%s\nsha=%s\n' "$GITHUB_WORKFLOW" "$GITHUB_JOB" "$GITHUB_SHA" > loop-diagnostics/backend/context.txt
+          find . -type f \( -path '*/target/surefire-reports/*' -o -path '*/target/failsafe-reports/*' \) -print0 | while IFS= read -r -d '' file; do
+            destination="loop-diagnostics/backend/${file#./}"
+            mkdir -p "$(dirname "$destination")"
+            cp "$file" "$destination"
+          done
+
+      - name: 上传后端诊断
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-backend-diagnostics
+          path: loop-diagnostics/backend
+          if-no-files-found: warn
+          retention-days: 14
