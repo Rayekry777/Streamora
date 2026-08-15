@@ -63,4 +63,4 @@ jobs:
           cache: maven
 
       - name: Maven 全量测试
-        run: ./mvnw -B -ntp verify
+        run: bash ./mvnw -B -ntp verify
