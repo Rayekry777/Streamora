@@ -18,11 +18,20 @@ test('用户端注册后切换个人宠物，且不能使用管理员会话', as
   await page.getByLabel('密码').fill('streamora-e2e-user-password')
   await page.getByRole('button', { name: '注册并登录' }).click()
 
-  await expect(page.getByRole('button', { name: '退出' })).toBeVisible()
+  const logoutButton = page.getByRole('button', { name: '退出登录', exact: true })
+  await expect(logoutButton).toBeVisible()
   await expect(page.getByTestId('global-pet-host')).toHaveAttribute('data-pet-source', 'PERSONAL')
 
   const response = await page.context().request.get(`${adminBaseUrl}/admin-api/v1/auth/session`)
   expect(response.status()).toBe(401)
+
+  await logoutButton.click()
+
+  await expect(page.getByRole('link', { name: '登录', exact: true })).toBeVisible()
+  await expect(page.getByTestId('global-pet-host')).toHaveAttribute('data-pet-source', 'PUBLIC')
+
+  const userSessionResponse = await page.context().request.get(`${webBaseUrl}/api/v1/auth/session`)
+  expect(userSessionResponse.status()).toBe(401)
 })
 
 test('管理端登录后可读取运营概览，且不能使用用户会话', async ({ page }) => {
