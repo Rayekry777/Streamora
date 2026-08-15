@@ -14,6 +14,7 @@ fi
 
 repo_url="$1"
 registration_token="$2"
+runner_url="${repo_url%.git}"
 runner_dir="$HOME/actions-runner"
 
 if ! command -v docker >/dev/null; then
@@ -35,6 +36,6 @@ if [[ ! -x ./config.sh ]]; then
   rm "$archive"
 fi
 
-./config.sh --unattended --url "$repo_url" --token "$registration_token" --name streamora-core --labels streamora-core --work _work --replace
+./config.sh --unattended --url "$runner_url" --token "$registration_token" --name streamora-core --labels streamora-core --work _work --replace
 sudo ./svc.sh install ub001
 sudo ./svc.sh start
