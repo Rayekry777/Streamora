@@ -58,7 +58,7 @@ jobs:
           gh pr comment "$pr_number" --body "<!-- streamora-loop
           verified_sha: ${VERIFIED_SHA}
           status: checks-passed-auto-merge-enabled
-          -->"
+          -->" || true
           merge_body="$(printf '%s\\n' \
             '功能明细：' \
             '- 已通过最新 GitHub Actions 验证并自动 squash 合并' \
