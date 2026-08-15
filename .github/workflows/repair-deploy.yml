@@ -389,3 +389,34 @@ jobs:
             --head "$BRANCH" \
             --title "fix(部署): 自动修复第 ${ATTEMPT} 轮" \
             --body-file "$body_file"
+
+  report-agent-failure:
+    needs: [prepare, generate-patch, generate-root-cause-patch]
+    if: >-
+      always() &&
+      needs.prepare.result == 'success' &&
+      needs.prepare.outputs.limit_reached == 'false' &&
+      (needs.generate-patch.result == 'failure' || needs.generate-root-cause-patch.result == 'failure')
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: 创建去重的部署修复阻塞 Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOT_SHA: ${{ needs.prepare.outputs.root_sha }}
+          ATTEMPT: ${{ needs.prepare.outputs.attempt }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="部署修复 Agent 已停止: ${ROOT_SHA:0:12}"
+          existing="$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')"
+          gh label create "agent:blocked" --color "B60205" --description "Loop Engineering 已停止，等待人工处理" --force || true
+          if [[ -n "$existing" ]]; then
+            exit 0
+          fi
+          gh issue create \
+            --title "$title" \
+            --label "agent:blocked" \
+            --body "Core 部署根提交 ${ROOT_SHA} 的第 ${ATTEMPT} 轮自动修复未能产生安全、可验证且可提交的改动。自动写入已停止，避免伪造修复成功。请查看诊断：${RUN_URL}。"
