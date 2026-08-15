@@ -6,12 +6,28 @@ FROM eclipse-temurin:21-jdk-alpine AS builder
 ARG SERVICE
 WORKDIR /workspace
 
-# 先复制包装器和构建描述，让依赖下载层可被多个服务镜像复用。
+# 先复制完整 Reactor 的构建描述，让依赖下载层可被多个服务镜像复用。
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
 COPY packages/proto/pom.xml packages/proto/pom.xml
 COPY services/pom.xml services/pom.xml
-COPY services/${SERVICE}/pom.xml services/${SERVICE}/pom.xml
+COPY services/gateway-service/pom.xml services/gateway-service/pom.xml
+COPY services/admin-service/pom.xml services/admin-service/pom.xml
+COPY services/identity-service/pom.xml services/identity-service/pom.xml
+COPY services/user-service/pom.xml services/user-service/pom.xml
+COPY services/video-service/pom.xml services/video-service/pom.xml
+COPY services/media-service/pom.xml services/media-service/pom.xml
+COPY services/transcode-worker/pom.xml services/transcode-worker/pom.xml
+COPY services/playback-service/pom.xml services/playback-service/pom.xml
+COPY services/danmaku-service/pom.xml services/danmaku-service/pom.xml
+COPY services/comment-service/pom.xml services/comment-service/pom.xml
+COPY services/engagement-service/pom.xml services/engagement-service/pom.xml
+COPY services/feed-service/pom.xml services/feed-service/pom.xml
+COPY services/search-service/pom.xml services/search-service/pom.xml
+COPY services/pet-service/pom.xml services/pet-service/pom.xml
+COPY services/agent-service/pom.xml services/agent-service/pom.xml
+COPY services/moderation-service/pom.xml services/moderation-service/pom.xml
+COPY services/notification-service/pom.xml services/notification-service/pom.xml
 RUN chmod +x mvnw
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -B -ntp -pl services/${SERVICE} -am dependency:go-offline
@@ -41,4 +57,3 @@ HEALTHCHECK --interval=20s --timeout=5s --start-period=60s --retries=5 \
 
 # exec 形式让 JVM 直接接收终止信号，配合 Spring 优雅关闭。
 ENTRYPOINT ["java", "-jar", "/app/application.jar"]
-
