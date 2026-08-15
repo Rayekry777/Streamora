@@ -44,10 +44,35 @@ jobs:
           deploy_sha="$(git rev-parse HEAD)"
           echo "sha=$deploy_sha" >> "$GITHUB_OUTPUT"
 
+      - name: 准备浏览器联调依赖
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
+
       - name: 构建并部署 Core
         id: deploy
         shell: bash
-        run: scripts/ci/deploy-core.sh "${{ steps.revision.outputs.sha }}"
+        run: scripts/ci/deploy-core.sh "${{ steps.revision.outputs.sha }}" scripts/ci/run-deployed-e2e.sh
+
+      - name: 上传浏览器联调报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-e2e-report
+          path: |
+            playwright-report/deployed
+            test-results/deployed
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: 收集失败诊断
         if: failure()

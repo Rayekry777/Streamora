@@ -1,6 +1,6 @@
 # Streamora
 
-部署与自动修复说明见 [docs/自动修复部署.md](docs/自动修复部署.md)。
+部署、自动修复与阶段发布流程见 [docs/自动修复部署.md](docs/自动修复部署.md) 和 [docs/acceptance/PHASE_RELEASE_CHECKLIST.md](docs/acceptance/PHASE_RELEASE_CHECKLIST.md)。
 
 Streamora 是面向封闭演示 MVP 的视频社区与 AI 宠物项目。用户端提供视频上传、播放、社区互动和跨页面 Live2D 宠物；独立管理端提供内容、用户、媒体、宠物资产和 AI 运营能力。
 

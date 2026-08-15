@@ -17,6 +17,8 @@ x-backend-environment: &backend-environment
   JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError
   MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
   SERVER_FORWARD_HEADERS_STRATEGY: framework
+  # 封闭演示通过回环 HTTP 访问；TLS 入口部署时应在本地 .env 覆盖为 true。
+  STREAMORA_SECURE_COOKIE: ${STREAMORA_SECURE_COOKIE:-false}
 
 x-backend-base: &backend-base
   build:

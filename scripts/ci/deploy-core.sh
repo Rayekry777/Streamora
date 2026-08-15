@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 || ! "$1" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Usage: $0 <40-character commit SHA>" >&2
+if [[ $# -lt 1 || ! "$1" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Usage: $0 <40-character commit SHA> [post-deploy-check-command...]" >&2
   exit 64
 fi
 
 deploy_sha="$1"
+shift
+post_deploy_check=("$@")
 repo_root="$(git rev-parse --show-toplevel)"
 compose_file="$repo_root/platform/compose/compose.yml"
 env_file="/opt/streamora/platform/compose/.env"
@@ -47,6 +49,15 @@ verify_core() {
   done < <(compose "$deploy_sha" ps -q)
 }
 
+run_post_deploy_check() {
+  if (( ${#post_deploy_check[@]} == 0 )); then
+    return 0
+  fi
+
+  echo "Running post-deployment browser integration checks."
+  "${post_deploy_check[@]}"
+}
+
 rollback() {
   local previous_sha="$1"
   echo "Deployment failed; restoring last healthy images $previous_sha." >&2
@@ -64,7 +75,7 @@ if ! compose "$deploy_sha" config --quiet; then
   exit 1
 fi
 
-if compose "$deploy_sha" up -d --build --wait --wait-timeout 900 --remove-orphans && verify_core; then
+if compose "$deploy_sha" up -d --build --wait --wait-timeout 900 --remove-orphans && verify_core && run_post_deploy_check; then
   install -d -m 700 "$state_dir"
   umask 077
   printf '{"sha":"%s","deployedAt":"%s"}\n' "$deploy_sha" "$(date --iso-8601=seconds)" > "$state_file"
