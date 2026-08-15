@@ -40,9 +40,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 校验 GitHub Actions 与 Shell
-        uses: rhysd/actionlint@v1
-        with:
-          shellcheck: true
+        shell: bash
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.11/scripts/download-actionlint.bash) 1.7.11 .
+          shellcheck_path="$(command -v shellcheck)"
+          ./actionlint -color -shellcheck "$shellcheck_path"
 
       - name: 校验提交与 PR 交付模板
         env:
