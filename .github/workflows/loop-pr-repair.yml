@@ -138,23 +138,29 @@ jobs:
           name: loop-pr-repair-input-${{ github.event.workflow_run.id }}
           path: loop-diagnostics
 
-      - name: 由 Codex 执行最小修复
-        uses: openai/codex-action@v1
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt: >-
-            Read .github/codex/prompts/pr-repair.md and loop-diagnostics/.
-            This is minimal repair attempt ${{ needs.prepare.outputs.attempt }} for PR #${{ needs.prepare.outputs.pr_number }}.
-            Root commit: ${{ needs.prepare.outputs.root_sha }}. Do not commit or push.
-          output-file: loop-minimal-repair-report.md
+      - name: 由 DeepSeek 执行最小修复
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_REPAIR_MODEL: ${{ vars.DEEPSEEK_REPAIR_MODEL || 'deepseek-chat' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/ci/deepseek-patch-agent.mjs \
+            --instruction .github/codex/prompts/pr-repair.md \
+            --diagnostics loop-diagnostics \
+            --mode pr-minimal \
+            --patch loop-minimal-repair.patch \
+            --report loop-minimal-repair-report.md
+          git apply --check loop-minimal-repair.patch
+          git apply loop-minimal-repair.patch
 
       - name: 校验最小修复边界
         shell: bash
         run: |
           set -euo pipefail
-          git add -N -- .
           git diff --check
-          changed_files="$(git diff --name-only -- . ':!loop-diagnostics' ':!loop-minimal-repair-report.md')"
+          scripts/ci/validate-repair-patch.sh
+          changed_files="$(git diff --name-only -- . ':!loop-diagnostics' ':!loop-minimal-repair.patch' ':!loop-minimal-repair-report.md')"
           test -n "$changed_files"
           while IFS= read -r file; do
             [[ -n "$file" ]] || continue
@@ -179,8 +185,8 @@ jobs:
           git config user.name "streamora-loop-repair[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git reset -- loop-diagnostics loop-minimal-repair-report.md || true
-          git diff --cached --quiet && { echo "Codex produced no eligible repair." >&2; exit 1; }
+          git reset -- loop-diagnostics loop-minimal-repair.patch loop-minimal-repair-report.md || true
+          git diff --cached --quiet && { echo "DeepSeek produced no eligible repair." >&2; exit 1; }
           git commit -F - <<EOF
           fix(治理): PR #${PR_NUMBER} 第 ${ATTEMPT} 轮最小修复
 
@@ -190,7 +196,7 @@ jobs:
 
           验证结果：
           - git diff --check：通过
-          - 精确失败检查由 Codex 按修复报告执行
+          - 精确失败检查由 DeepSeek 按修复报告执行
 
           未运行项：
           - 完整前后端验证由本次推送触发的 GitHub Actions 执行
@@ -219,13 +225,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: loop-pr-minimal-repair-${{ needs.prepare.outputs.pr_number }}-${{ needs.prepare.outputs.attempt }}
-          path: loop-minimal-repair-report.md
+          path: |
+            loop-minimal-repair.patch
+            loop-minimal-repair-report.md
           if-no-files-found: warn
           retention-days: 14
 
   root-cause-repair:
-    needs: [prepare, minimal-repair]
+    needs: prepare
     if: >-
+      always() &&
+      needs.prepare.result == 'success' &&
       needs.prepare.outputs.blocked == 'false' &&
       needs.prepare.outputs.mode == 'root-cause'
     runs-on: ubuntu-24.04
@@ -253,23 +263,29 @@ jobs:
           name: loop-pr-repair-input-${{ github.event.workflow_run.id }}
           path: loop-diagnostics
 
-      - name: 由 Codex 根因 Agent 执行第四轮修复
-        uses: openai/codex-action@v1
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt: >-
-            Read .github/codex/prompts/pr-root-cause-repair.md and loop-diagnostics/.
-            This is root-cause attempt 4 for PR #${{ needs.prepare.outputs.pr_number }}.
-            Root commit: ${{ needs.prepare.outputs.root_sha }}. Do not commit or push.
-          output-file: loop-root-cause-report.md
+      - name: 由 DeepSeek 根因 Agent 执行第四轮修复
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_REPAIR_MODEL: ${{ vars.DEEPSEEK_REPAIR_MODEL || 'deepseek-chat' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/ci/deepseek-patch-agent.mjs \
+            --instruction .github/codex/prompts/pr-root-cause-repair.md \
+            --diagnostics loop-diagnostics \
+            --mode pr-root-cause \
+            --patch loop-root-cause.patch \
+            --report loop-root-cause-report.md
+          git apply --check loop-root-cause.patch
+          git apply loop-root-cause.patch
 
       - name: 校验根因修复边界
         shell: bash
         run: |
           set -euo pipefail
-          git add -N -- .
           git diff --check
-          changed_files="$(git diff --name-only -- . ':!loop-diagnostics' ':!loop-root-cause-report.md')"
+          scripts/ci/validate-repair-patch.sh
+          changed_files="$(git diff --name-only -- . ':!loop-diagnostics' ':!loop-root-cause.patch' ':!loop-root-cause-report.md')"
           test -n "$changed_files"
           while IFS= read -r file; do
             [[ -n "$file" ]] || continue
@@ -294,8 +310,8 @@ jobs:
           git config user.name "streamora-loop-root-cause[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git reset -- loop-diagnostics loop-root-cause-report.md || true
-          git diff --cached --quiet && { echo "Codex produced no eligible root-cause repair." >&2; exit 1; }
+          git reset -- loop-diagnostics loop-root-cause.patch loop-root-cause-report.md || true
+          git diff --cached --quiet && { echo "DeepSeek produced no eligible root-cause repair." >&2; exit 1; }
           git commit -F - <<EOF
           fix(治理): PR #${PR_NUMBER} 根因修复
 
@@ -305,7 +321,7 @@ jobs:
 
           验证结果：
           - git diff --check：通过
-          - 精确失败检查和相关回归由 Codex 按根因报告执行
+          - 精确失败检查和相关回归由 DeepSeek 按根因报告执行
 
           未运行项：
           - 完整前后端验证由本次推送触发的 GitHub Actions 执行
@@ -334,7 +350,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: loop-pr-root-cause-${{ needs.prepare.outputs.pr_number }}
-          path: loop-root-cause-report.md
+          path: |
+            loop-root-cause.patch
+            loop-root-cause-report.md
           if-no-files-found: warn
           retention-days: 14
 
