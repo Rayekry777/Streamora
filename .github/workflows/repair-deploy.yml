@@ -155,7 +155,7 @@ jobs:
           fi
           gh issue create \
             --title "$title" \
-            --body "部署失败后未启动 Codex 最小修复，因为仓库 Actions secrets 缺少 DEPLOY_REPAIR_GITHUB_TOKEN。该专用账号的细粒度 PAT 必须具备 Contents: Read and write、Pull requests: Read and write 权限。它用于推送修复分支、创建修复 PR 和合并已验证 PR，以触发后续验证和部署。添加后请重新运行失败的部署：${DEPLOY_RUN}"
+            --body "部署失败后未启动 Codex 最小修复，因为仓库 Actions secrets 缺少 DEPLOY_REPAIR_GITHUB_TOKEN。该专用账号的细粒度 PAT 必须具备 Contents: Read and write、Pull requests: Read and write、Issues: Read and write、Checks: Read 权限；它用于推送修复分支、创建和合并 PR、更新循环标签和查询当前检查状态，以触发后续验证和部署。添加后请重新运行失败的部署：${DEPLOY_RUN}"
 
   generate-patch:
     needs: prepare
@@ -384,8 +384,8 @@ jobs:
 
           - 阶段 3：待验收
           EOF
-          pr_url="$(gh pr create \
+          gh pr create \
             --base master \
             --head "$BRANCH" \
             --title "fix(部署): 自动修复第 ${ATTEMPT} 轮" \
-            --body-file "$body_file")"
+            --body-file "$body_file"

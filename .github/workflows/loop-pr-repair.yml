@@ -72,13 +72,15 @@ jobs:
             mode="blocked"
             blocked=true
           fi
-          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "root_sha=$root_sha" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "attempt=$attempt" >> "$GITHUB_OUTPUT"
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "blocked=$blocked" >> "$GITHUB_OUTPUT"
+          {
+            echo "pr_number=$pr_number"
+            echo "branch=$BRANCH"
+            echo "root_sha=$root_sha"
+            echo "head_sha=$HEAD_SHA"
+            echo "attempt=$attempt"
+            echo "mode=$mode"
+            echo "blocked=$blocked"
+          } >> "$GITHUB_OUTPUT"
 
       - name: 下载前端诊断
         continue-on-error: true
@@ -225,7 +227,7 @@ jobs:
     needs: [prepare, minimal-repair]
     if: >-
       needs.prepare.outputs.blocked == 'false' &&
-      (needs.prepare.outputs.mode == 'root-cause' || needs.minimal-repair.result == 'failure')
+      needs.prepare.outputs.mode == 'root-cause'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -257,7 +259,7 @@ jobs:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt: >-
             Read .github/codex/prompts/pr-root-cause-repair.md and loop-diagnostics/.
-            This is root-cause escalation attempt ${{ needs.prepare.outputs.attempt }} for PR #${{ needs.prepare.outputs.pr_number }}.
+            This is root-cause attempt 4 for PR #${{ needs.prepare.outputs.pr_number }}.
             Root commit: ${{ needs.prepare.outputs.root_sha }}. Do not commit or push.
           output-file: loop-root-cause-report.md
 
@@ -367,7 +369,7 @@ jobs:
       always() &&
       needs.prepare.result == 'success' &&
       needs.prepare.outputs.blocked == 'false' &&
-      needs.root-cause-repair.result == 'failure'
+      (needs.minimal-repair.result == 'failure' || needs.root-cause-repair.result == 'failure')
     runs-on: ubuntu-24.04
     permissions:
       issues: write
