@@ -7,13 +7,14 @@ description: 管理 Streamora 项目的阶段推进、里程碑门禁、验收�
 
 ## 执行顺序
 
-1. 完整读取 `docs/project/PROJECT_ROADMAP.md`、`docs/development/BACKEND_DEVELOPMENT.md` 和当前阶段验收文件。
-2. 检查工作区、已有实现、验证记录和用户未提交改动，以事实校正阶段状态。
-3. 只执行当前里程碑；按“契约、后端主链路、用户端与管理端、联调、验收”推进。
-4. 涉及新方案、依赖或组件时，完整读取并执行 [开源方案优先政策](../../../docs/development/OPEN_SOURCE_ADOPTION_POLICY.md)，先调研成熟开源方案并记录结论。
-5. 使用 [里程碑门禁](references/milestone-gates.md) 判断是否达到出口条件。
-6. 使用 [状态规则](references/status-rules.md) 更新状态，禁止跳过“待验收”。
-7. 按 [交付报告](references/delivery-report.md) 写入阶段验收文件并向用户报告。
+1. 先读取 [本机工具定位](references/local-tooling.md)，直接使用固定命令执行本地 GitHub、pnpm 和 Maven 操作。
+2. 完整读取 `docs/project/PROJECT_ROADMAP.md`、`docs/development/BACKEND_DEVELOPMENT.md` 和当前阶段验收文件。
+3. 检查工作区、已有实现、验证记录和用户未提交改动，以事实校正阶段状态。
+4. 只执行当前里程碑；按“契约、后端主链路、用户端与管理端、联调、验收”推进。
+5. 涉及新方案、依赖或组件时，完整读取并执行 [开源方案优先政策](../../../docs/development/OPEN_SOURCE_ADOPTION_POLICY.md)，先调研成熟开源方案并记录结论。
+6. 使用 [里程碑门禁](references/milestone-gates.md) 判断是否达到出口条件。
+7. 使用 [状态规则](references/status-rules.md) 更新状态，禁止跳过“待验收”。
+8. 按 [交付报告](references/delivery-report.md) 写入阶段验收文件并向用户报告。
 
 ## 提交前 Loop Engineering
 

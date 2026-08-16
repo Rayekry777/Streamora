@@ -9,11 +9,12 @@ description: 管理 Streamora 的自动 Git 提交、首次推送门禁、PR 创
 
 ## 本地循环
 
-1. 为任务生成 `Loop-Id`，按用户端、管理端、后端、契约或基础设施划分提交边界。
-2. 检查当前分支、工作区和活动任务。仅当分支非受保护、无无关改动且属于当前任务时复用；否则创建 `agent/<loop-id>-<slug>`。
-3. 实现后启动独立质量 Agent。质量 Agent 可在相同范围内修复并复验，但不得提交或推送。
-4. 通过门禁后自动创建中文 Conventional Commit，包含四个正文区块和 Loop Trailer。
-5. 对话任务在首次推送前请求用户确认；Issue 的 `agent:ready` 标签即为首次推送授权。
+1. 先读取 [本机工具定位](../streamora-delivery-workflow/references/local-tooling.md)，GitHub 操作直接使用固定 GitHub CLI 路径。
+2. 为任务生成 `Loop-Id`，按用户端、管理端、后端、契约或基础设施划分提交边界。
+3. 检查当前分支、工作区和活动任务。仅当分支非受保护、无无关改动且属于当前任务时复用；否则创建 `agent/<loop-id>-<slug>`。
+4. 实现后启动独立质量 Agent。质量 Agent 可在相同范围内修复并复验，但不得提交或推送。
+5. 通过门禁后自动创建中文 Conventional Commit，包含四个正文区块和 Loop Trailer。
+6. 对话任务在首次推送前请求用户确认；Issue 的 `agent:ready` 标签即为首次推送授权。
 
 ## 远端循环
 
