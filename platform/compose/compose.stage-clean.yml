@@ -1,0 +1,65 @@
+services:
+  postgres:
+    volumes: !override
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+        tmpfs:
+          mode: 0777
+      - type: bind
+        source: ./postgres/init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+  redis:
+    volumes: !override
+      - type: tmpfs
+        target: /data
+        tmpfs:
+          mode: 0777
+  minio:
+    volumes: !override
+      - type: tmpfs
+        target: /data
+        tmpfs:
+          mode: 0777
+  rocketmq-namesrv:
+    volumes: !override
+      - type: tmpfs
+        target: /home/rocketmq/logs
+        tmpfs:
+          mode: 0777
+  rocketmq-broker:
+    volumes: !override
+      - type: tmpfs
+        target: /home/rocketmq/store
+        tmpfs:
+          mode: 0777
+  rocketmq-volume-init:
+    volumes: !override
+      - type: tmpfs
+        target: /home/rocketmq/store
+        tmpfs:
+          mode: 0777
+  prometheus:
+    volumes: !override
+      - type: tmpfs
+        target: /prometheus
+        tmpfs:
+          mode: 0777
+  loki:
+    volumes: !override
+      - type: tmpfs
+        target: /loki
+        tmpfs:
+          mode: 0777
+  tempo:
+    volumes: !override
+      - type: tmpfs
+        target: /var/tempo
+        tmpfs:
+          mode: 0777
+  grafana:
+    volumes: !override
+      - type: tmpfs
+        target: /var/lib/grafana
+        tmpfs:
+          mode: 0777

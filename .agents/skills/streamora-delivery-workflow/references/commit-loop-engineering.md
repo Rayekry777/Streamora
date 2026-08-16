@@ -50,6 +50,8 @@ git switch -c feature/<领域>-<主题>
 | 前后端接口 | OpenAPI 生成与校验、受影响前端测试、真实接口或契约测试 |
 | Docker/Compose/部署 | 对应 Compose 配置校验、镜像构建或 GitHub 部署诊断规定的检查 |
 
+本机没有 Docker 时，提交前仍执行可运行的静态与单元验证，并把 Docker 检查明确列入“未运行项”；推送后的“功能 Docker 验证”必须在 GitHub 托管 Runner 通过。阶段分支只有在当前 SHA 的功能验证通过、转为非 Draft 并添加 `stage:ready` 后，才运行虚拟机累计验收。
+
 按改动风险增加 E2E、安全和性能检查。无法执行的检查必须写入“未运行项”并说明原因。
 
 ## 强制提交格式

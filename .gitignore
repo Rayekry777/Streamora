@@ -91,6 +91,8 @@ replay_pid*
 /platform/data/
 /platform/volumes/
 /platform/observability/data/
+/platform/stage-evidence/
+/platform/stage-diagnostics/
 
 # Generated media processing artifacts
 **/.transcode-cache/
@@ -107,4 +109,3 @@ replay_pid*
 
 # Local Codex state; project skills in .agents/ remain tracked
 .codex/
-

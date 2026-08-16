@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-export const MAX_REPAIR_ATTEMPTS = 3;
+export const MAX_REPAIR_ATTEMPTS = 5;
+const STAGE_BRANCH = /^(?:feature\/phase-(\d+)-.+|agent\/.+-phase-(\d+)-.+)$/;
 
 const PROHIBITED_PATH = /^(?:\.github\/|\.env(?:\.|$)|.*\/\.env(?:\.|$)|.*application-secret.*\.ya?ml$|.*\.(?:pem|key|p12|pfx|jks|keystore)$|.*\/db\/migration\/|(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock|npm-shrinkwrap\.json|composer\.lock|Gemfile\.lock)$)/i;
 const VOLUME_DELETION = /(?:docker\s+compose\s+.*\bdown\b.*-v|docker\s+volume\s+rm|rm\s+-rf\s+.*\b(?:data|volume|volumes)\b)/i;
@@ -45,7 +46,42 @@ export function createLoopState({ rootSha, kind, reference, branch = null }) {
     latestSha: null,
     latestRunId: null,
     repairPr: null,
+    phaseNumber: stagePhaseFromBranch(branch),
+    stageAuthorizedSha: null,
+    stageRunId: null,
+    upgradeResult: null,
+    cleanInstallResult: null,
+    imageDigest: null,
+    acceptanceRunUrl: null,
     terminalReason: null,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export function stagePhaseFromBranch(branch) {
+  const match = branch?.match(STAGE_BRANCH);
+  return match ? Number(match[1] ?? match[2]) : null;
+}
+
+export function requiresStageAcceptance(branch) {
+  return stagePhaseFromBranch(branch) !== null;
+}
+
+export function applyStageEvidence(state, evidence, run) {
+  if (!evidence || evidence.candidateSha !== state.latestSha) {
+    throw new Error('Stage evidence does not belong to the latest PR SHA.');
+  }
+  if (evidence.phase !== state.phaseNumber || evidence.upgrade !== 'success' || evidence.cleanInstall !== 'success') {
+    throw new Error('Stage evidence is incomplete or belongs to another phase.');
+  }
+  return {
+    ...state,
+    stageAuthorizedSha: evidence.candidateSha,
+    stageRunId: run.databaseId,
+    upgradeResult: evidence.upgrade,
+    cleanInstallResult: evidence.cleanInstall,
+    imageDigest: evidence.imageDigest ?? null,
+    acceptanceRunUrl: run.url,
     updatedAt: new Date().toISOString()
   };
 }

@@ -4,6 +4,11 @@ param(
   [int]$Pr,
   [Parameter(Mandatory, ParameterSetName = 'Issue')]
   [int]$Issue,
+  [Parameter(ParameterSetName = 'Issue')]
+  [ValidateRange(1, 8)]
+  [int]$StagePhase,
+  [Parameter(ParameterSetName = 'Issue')]
+  [switch]$AllowFirstPush,
   [Parameter(ParameterSetName = 'Watch')]
   [switch]$Watch,
   [ValidateRange(30, 900)]
@@ -12,6 +17,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($PSCmdlet.ParameterSetName -eq 'Issue' -and -not $AllowFirstPush.IsPresent) {
+  throw "Issue 自动任务的首次推送尚未授权；确认后使用 -AllowFirstPush 重新启动。"
+}
 $script:LoopWatchMode = $PSCmdlet.ParameterSetName -eq 'Watch'
 
 . "$PSScriptRoot\Initialize-StreamoraToolchain.ps1" -RequireCodex | Out-Null
@@ -65,7 +73,8 @@ function Ensure-LoopLabels {
     @{ name = 'agent:repairing'; color = 'FBCA04'; description = '本机 Codex 正在修复' },
     @{ name = 'agent:root-cause'; color = 'B60205'; description = '本机 Loop 正在根因分析' },
     @{ name = 'agent:blocked'; color = 'D93F0B'; description = '本机 Loop 已停止自动写入' },
-    @{ name = 'agent:done'; color = '0E8A16'; description = '本机 Loop 已完成' }
+    @{ name = 'agent:done'; color = '0E8A16'; description = '本机 Loop 已完成' },
+    @{ name = 'stage:ready'; color = '5319E7'; description = '授权当前阶段 PR Head SHA 执行虚拟机验收' }
   )
   $existing = @(Invoke-GhJson @('label', 'list', '--limit', '100', '--json', 'name') | ForEach-Object { $_.name })
   foreach ($label in $labels) {
@@ -73,6 +82,46 @@ function Ensure-LoopLabels {
       Invoke-Native -File 'gh' -Arguments @('label', 'create', $label.name, '--color', $label.color, '--description', $label.description) | Out-Null
     }
   }
+}
+
+function Get-StagePhase {
+  param([string]$Branch)
+  if ($Branch -match '^feature/phase-(\d+)-.+' -or $Branch -match '^agent/.+-phase-(\d+)-.+') {
+    return [int]$Matches[1]
+  }
+  return $null
+}
+
+function Test-AuthorizedLoopRepairCommit {
+  param([pscustomobject]$State, [string]$HeadSha)
+  if ([int]$State.repairAttempt -lt 1 -or [int]$State.repairAttempt -gt 5) {
+    return $false
+  }
+  $message = Invoke-Native -File 'gh' -Arguments @('api', "repos/$(Get-RepositoryName)/commits/$HeadSha", '--jq', '.commit.message')
+  $root = [regex]::Escape($State.rootSha)
+  $attempt = [regex]::Escape([string]$State.repairAttempt)
+  return ($message -match "(?m)^Streamora-Loop-Root:\s*$root\s*$" -and
+    $message -match "(?m)^Streamora-Loop-Attempt:\s*$attempt\s*$" -and
+    $message -match '(?m)^Streamora-Loop-Mode:\s*ci-repair\s*$')
+}
+
+function Update-LoopStateSchema {
+  param([pscustomobject]$State)
+  $defaults = [ordered]@{
+    phaseNumber = (Get-StagePhase $State.branch)
+    stageAuthorizedSha = $null
+    stageRunId = $null
+    upgradeResult = $null
+    cleanInstallResult = $null
+    imageDigest = $null
+    acceptanceRunUrl = $null
+  }
+  foreach ($entry in $defaults.GetEnumerator()) {
+    if ($State.PSObject.Properties.Name -notcontains $entry.Key) {
+      $State | Add-Member -NotePropertyName $entry.Key -NotePropertyValue $entry.Value
+    }
+  }
+  return $State
 }
 
 function Get-TaskPath {
@@ -94,11 +143,12 @@ function Get-LoopState {
   if (-not (Test-Path -LiteralPath $path)) {
     return $null
   }
-  return (Get-Content -Raw -LiteralPath $path | ConvertFrom-Json)
+  return (Update-LoopStateSchema (Get-Content -Raw -LiteralPath $path | ConvertFrom-Json))
 }
 
 function New-LoopState {
   param([string]$Kind, [string]$Reference, [string]$RootSha, [string]$Branch, [Nullable[int]]$SourceIssue = $null)
+  $stagePhase = Get-StagePhase $Branch
   $state = [pscustomobject]@{
     version = 1
     kind = $Kind
@@ -110,6 +160,13 @@ function New-LoopState {
     latestSha = $null
     latestRunId = $null
     repairPr = $null
+    phaseNumber = $stagePhase
+    stageAuthorizedSha = $null
+    stageRunId = $null
+    upgradeResult = $null
+    cleanInstallResult = $null
+    imageDigest = $null
+    acceptanceRunUrl = $null
     prNumber = $null
     sourceIssue = $SourceIssue
     repairBaseSha = $null
@@ -148,7 +205,7 @@ function Get-WorkflowRun {
 
 function Get-NextAttempt {
   param([pscustomobject]$State)
-  if ($State.repairAttempt -ge 3 -or $State.phase -eq 'blocked') {
+  if ($State.repairAttempt -ge 5 -or $State.phase -eq 'blocked') {
     return $null
   }
   return ([int]$State.repairAttempt + 1)
@@ -180,6 +237,48 @@ function Download-Diagnostics {
     $_ | Out-String | Set-Content -LiteralPath (Join-Path $destination 'artifact-download-error.txt') -Encoding utf8
   }
   return $destination
+}
+
+function Read-StageEvidence {
+  param([pscustomobject]$State, [pscustomobject]$Run)
+  $destination = Download-Diagnostics -State $State -Run $Run -Pattern 'stage-evidence'
+  $evidenceFile = Get-ChildItem -LiteralPath $destination -Recurse -File -Filter 'stage-acceptance.json' | Select-Object -First 1
+  if (-not $evidenceFile) {
+    throw "Stage run $($Run.databaseId) did not contain stage-acceptance.json."
+  }
+  $evidence = Get-Content -Raw -LiteralPath $evidenceFile.FullName | ConvertFrom-Json
+  if ($evidence.candidateSha -ne $State.latestSha -or [int]$evidence.phase -ne [int]$State.phaseNumber) {
+    throw 'Stage evidence does not match the current phase and PR Head SHA.'
+  }
+  if ($evidence.upgrade -ne 'success' -or $evidence.cleanInstall -ne 'success') {
+    throw 'Stage evidence does not prove both upgrade and clean-install success.'
+  }
+  return $evidence
+}
+
+function Get-NonRepairableStageReason {
+  param([string]$DiagnosticDirectory, [string]$Conclusion)
+  if ($Conclusion -in @('action_required', 'startup_failure', 'stale', 'cancelled', 'timed_out')) {
+    return "阶段验收基础设施状态为 $Conclusion，自动修复已停止。"
+  }
+  $patterns = @(
+    'Automatic state restoration is disabled',
+    'No previous health record exists',
+    'without-safe-restoration',
+    'upgrade-failed-without-previous-health-record',
+    'upgrade-failed-after-migration-change',
+    'VM-local Compose environment file is missing',
+    'Stage VM resources are insufficient',
+    'Resource not accessible by integration',
+    'credentials are unavailable'
+  )
+  $files = @(Get-ChildItem -LiteralPath $DiagnosticDirectory -Recurse -File -ErrorAction SilentlyContinue)
+  foreach ($pattern in $patterns) {
+    if ($files.Count -gt 0 -and (Select-String -LiteralPath $files.FullName -SimpleMatch $pattern -Quiet)) {
+      return "阶段验收遇到不可安全自动修复的问题：$pattern"
+    }
+  }
+  return $null
 }
 
 function Test-LoopChangeBoundary {
@@ -227,7 +326,7 @@ function Invoke-CodexChange {
     $State.repairAttempt = $attempt
     $State.phase = 'monitoring'
     Save-LoopState $State | Out-Null
-    if ($attempt -ge 3) {
+    if ($attempt -ge 5) {
       Set-Blocked $State "第 $attempt 次修复未通过本地边界或验证：$($_.Exception.Message)" ''
     }
     return $false
@@ -276,6 +375,11 @@ Streamora-Loop-Mode: $loopMode
   Invoke-Native -File 'git' -Arguments @('push', 'origin', "HEAD:$($State.branch)") -WorkingDirectory $controlledClone | Out-Null
   $State.repairAttempt = $attempt
   $State.latestSha = (Invoke-Native -File 'git' -Arguments @('rev-parse', 'HEAD') -WorkingDirectory $controlledClone).Trim()
+  $State.stageRunId = $null
+  $State.upgradeResult = $null
+  $State.cleanInstallResult = $null
+  $State.imageDigest = $null
+  $State.acceptanceRunUrl = $null
   $State.phase = 'monitoring'
   Save-LoopState $State | Out-Null
 }
@@ -290,7 +394,10 @@ function Monitor-Deployment {
   if (-not $State.deploymentSha) {
     return
   }
-  $run = Get-WorkflowRun -Workflow '部署 Core' -Sha $State.deploymentSha -Event 'workflow_run'
+  $run = Get-WorkflowRun -Workflow '部署 Core' -Sha $State.deploymentSha -Event 'workflow_dispatch'
+  if (-not $run) {
+    $run = Get-WorkflowRun -Workflow '部署 Core' -Sha $State.deploymentSha -Event 'workflow_run'
+  }
   if (-not $run -or $run.status -ne 'completed') {
     return
   }
@@ -351,17 +458,42 @@ function Monitor-Deployment {
 function Monitor-Pr {
   param([pscustomobject]$State)
   $targetPr = if ($State.prNumber) { $State.prNumber } else { $State.reference }
-  $prData = Invoke-GhJson @('pr', 'view', "$targetPr", '--json', 'number,state,headRefName,headRefOid,baseRefName,mergeCommit,url')
+  $prData = Invoke-GhJson @('pr', 'view', "$targetPr", '--json', 'number,state,headRefName,headRefOid,baseRefName,mergeCommit,url,isDraft,labels')
   if ($prData.baseRefName -ne 'master') {
     throw "PR #$targetPr is not targeting master."
   }
   if ($prData.state -eq 'MERGED') {
-    if (-not $State.deploymentSha) {
-      $State.deploymentSha = (Invoke-Native -File 'gh' -Arguments @('api', "repos/$(Get-RepositoryName)/pulls/$targetPr", '--jq', '.merge_commit_sha')).Trim()
-      $State.phase = 'await-deploy'
-      Save-LoopState $State | Out-Null
+    if ($State.branch -like 'deploy-repair/*') {
+      if (-not $State.deploymentSha) {
+        $State.deploymentSha = $prData.mergeCommit.oid
+        Invoke-Native -File 'gh' -Arguments @('workflow', 'run', 'deploy-core.yml', '--ref', 'master', '-f', "ref=$($State.deploymentSha)") | Out-Null
+        $State.phase = 'await-deploy'
+        Save-LoopState $State | Out-Null
+      }
+      Monitor-Deployment $State
+      return
     }
-    Monitor-Deployment $State
+    if ($null -ne $State.phaseNumber) {
+      $mergeSha = $prData.mergeCommit.oid
+      if (-not $mergeSha) {
+        return
+      }
+      $promotionRun = Get-WorkflowRun -Workflow '阶段晋升关联' -Sha $mergeSha -Event 'pull_request'
+      if (-not $promotionRun -or $promotionRun.status -ne 'completed') {
+        $State.phase = 'await-stage-promotion'
+        Save-LoopState $State | Out-Null
+        return
+      }
+      if ($promotionRun.conclusion -ne 'success') {
+        Set-Blocked $State 'Squash 合并源码树与阶段验收候选无法安全关联。' $promotionRun.url
+        return
+      }
+    }
+    $State.phase = 'completed'
+    Save-LoopState $State | Out-Null
+    if ($State.sourceIssue) {
+      Invoke-Native -File 'gh' -Arguments @('issue', 'edit', "$($State.sourceIssue)", '--remove-label', 'agent:running', '--add-label', 'agent:done') | Out-Null
+    }
     return
   }
   if ($prData.state -ne 'OPEN') {
@@ -369,6 +501,7 @@ function Monitor-Pr {
     return
   }
   $State.branch = $prData.headRefName
+  $State.phaseNumber = Get-StagePhase $prData.headRefName
   $State.latestSha = $prData.headRefOid
   Save-LoopState $State | Out-Null
   $run = Get-WorkflowRun -Workflow '验证' -Sha $prData.headRefOid -Event 'pull_request'
@@ -376,6 +509,69 @@ function Monitor-Pr {
     return
   }
   if ($run.conclusion -eq 'success') {
+    if ($null -ne $State.phaseNumber) {
+      $labels = @($prData.labels.name)
+      if ($prData.isDraft -or $labels -notcontains 'stage:ready') {
+        $State.phase = 'await-stage-authorization'
+        Save-LoopState $State | Out-Null
+        return
+      }
+      if ($State.stageAuthorizedSha -and $State.stageAuthorizedSha -ne $prData.headRefOid) {
+        if (-not (Test-AuthorizedLoopRepairCommit -State $State -HeadSha $prData.headRefOid)) {
+          $State.phase = 'await-stage-authorization'
+          Save-LoopState $State | Out-Null
+          return
+        }
+        $staleStageRun = Get-WorkflowRun -Workflow '阶段验收' -Sha $prData.headRefOid -Event 'pull_request'
+        Invoke-Native -File 'gh' -Arguments @('pr', 'edit', "$($prData.number)", '--remove-label', 'stage:ready') | Out-Null
+        Invoke-Native -File 'gh' -Arguments @('pr', 'edit', "$($prData.number)", '--add-label', 'stage:ready') | Out-Null
+        $State.stageAuthorizedSha = $prData.headRefOid
+        $State.stageRunId = if ($staleStageRun) { $staleStageRun.databaseId } else { $null }
+        $State.phase = 'await-stage-reauthorization'
+        Save-LoopState $State | Out-Null
+        return
+      }
+      if (-not $State.stageAuthorizedSha) {
+        $State.stageAuthorizedSha = $prData.headRefOid
+        Save-LoopState $State | Out-Null
+      }
+      $stageRun = Get-WorkflowRun -Workflow '阶段验收' -Sha $prData.headRefOid -Event 'pull_request'
+      if ($State.phase -eq 'await-stage-reauthorization' -and $stageRun -and $State.stageRunId -eq $stageRun.databaseId) {
+        return
+      }
+      if (-not $stageRun -or $stageRun.status -ne 'completed') {
+        return
+      }
+      if ($stageRun.conclusion -eq 'success') {
+        $evidence = Read-StageEvidence -State $State -Run $stageRun
+        $State.stageRunId = $stageRun.databaseId
+        $State.upgradeResult = $evidence.upgrade
+        $State.cleanInstallResult = $evidence.cleanInstall
+        $State.imageDigest = $evidence.imageDigest
+        $State.acceptanceRunUrl = $stageRun.url
+        Request-AutoMerge -PrNumber $prData.number -HeadSha $prData.headRefOid
+        $State.phase = 'await-merge'
+        Save-LoopState $State | Out-Null
+        return
+      }
+      $stageVmConclusion = (Invoke-Native -File 'gh' -Arguments @('run', 'view', "$($stageRun.databaseId)", '--json', 'jobs', '--jq', '.jobs[] | select(.name == "虚拟机阶段验收") | .conclusion')).Trim()
+      if (-not $stageVmConclusion -or $stageVmConclusion -eq 'skipped') {
+        $State.stageAuthorizedSha = $null
+        $State.phase = 'await-stage-authorization'
+        Save-LoopState $State | Out-Null
+        return
+      }
+      $diagnostics = Download-Diagnostics -State $State -Run $stageRun -Pattern 'stage-diagnostics'
+      $terminalReason = Get-NonRepairableStageReason -DiagnosticDirectory $diagnostics -Conclusion $stageRun.conclusion
+      if ($terminalReason) {
+        Set-Blocked $State $terminalReason $stageRun.url
+        return
+      }
+      if (Invoke-CodexChange -State $State -DiagnosticDirectory $diagnostics -Mode 'pr') {
+        Commit-And-PushRepair -State $State -Mode 'pr'
+      }
+      return
+    }
     Request-AutoMerge -PrNumber $prData.number -HeadSha $prData.headRefOid
     $State.phase = 'await-merge'
     Save-LoopState $State | Out-Null
@@ -401,7 +597,7 @@ function Start-PrLoop {
 }
 
 function Start-IssueLoop {
-  param([int]$Number)
+  param([int]$Number, [int]$PhaseNumber = 0, [bool]$FirstPushAuthorized = $false)
   $issue = Invoke-GhJson @('issue', 'view', "$Number", '--json', 'number,title,body,author,labels,state')
   if ($issue.state -ne 'OPEN' -or -not (@($issue.labels.name) -contains 'agent:ready')) {
     throw "Issue #$Number must be open and labeled agent:ready."
@@ -412,7 +608,11 @@ function Start-IssueLoop {
   }
   Ensure-ControlledClone
   $rootSha = (Invoke-Native -File 'git' -Arguments @('rev-parse', 'origin/master') -WorkingDirectory $controlledClone).Trim()
-  $branch = "agent/issue-$Number-$($rootSha.Substring(0, 12))"
+  $branch = if ($PhaseNumber -gt 0) {
+    "agent/issue-$Number-phase-$PhaseNumber-$($rootSha.Substring(0, 12))"
+  } else {
+    "agent/issue-$Number-$($rootSha.Substring(0, 12))"
+  }
   $existingState = Get-LoopState 'issue' "$Number"
   if ($existingState) {
     if ($existingState.prNumber) {
@@ -430,6 +630,9 @@ function Start-IssueLoop {
       return (New-LoopState -Kind 'pr' -Reference "$existingPrNumber" -RootSha $existingState.rootSha -Branch $existingState.branch -SourceIssue $Number)
     }
     throw "Issue #$Number already has loop state without a linked PR. Review $(Get-TaskPath 'issue' "$Number") before retrying."
+  }
+  if (-not $FirstPushAuthorized) {
+    throw "Issue #$Number 的首次推送尚未授权；确认后使用 -AllowFirstPush 重新启动。"
   }
   $state = New-LoopState -Kind 'issue' -Reference "$Number" -RootSha $rootSha -Branch $branch -SourceIssue $Number
   $state.phase = 'running'
@@ -506,7 +709,11 @@ Streamora-Loop-Mode: feature
 
 - 阶段 3：待验收
 "@ | Set-Content -LiteralPath $body -Encoding utf8
-  Invoke-Native -File 'gh' -Arguments @('pr', 'create', '--base', 'master', '--head', $branch, '--title', "feat(交付): 实现 Issue #$Number", '--body-file', $body) | Out-Null
+  $createPrArguments = @('pr', 'create', '--base', 'master', '--head', $branch, '--title', "feat(交付): 实现 Issue #$Number", '--body-file', $body)
+  if ($PhaseNumber -gt 0) {
+    $createPrArguments += '--draft'
+  }
+  Invoke-Native -File 'gh' -Arguments $createPrArguments | Out-Null
   $prNumber = (Invoke-Native -File 'gh' -Arguments @('pr', 'list', '--head', $branch, '--base', 'master', '--state', 'open', '--json', 'number', '--jq', '.[0].number')).Trim()
   Invoke-Native -File 'gh' -Arguments @('issue', 'edit', "$Number", '--remove-label', 'agent:ready', '--add-label', 'agent:running') | Out-Null
   $state.prNumber = [int]$prNumber
@@ -516,7 +723,7 @@ Streamora-Loop-Mode: feature
 }
 
 function Get-WatchedStates {
-  return @(Get-ChildItem -LiteralPath $taskDirectory -Filter '*.json' | ForEach-Object { Get-Content -Raw $_.FullName | ConvertFrom-Json } | Where-Object { $_.kind -ne 'issue' -and $_.phase -notin @('completed', 'blocked', 'handed-off') })
+  return @(Get-ChildItem -LiteralPath $taskDirectory -Filter '*.json' | ForEach-Object { Update-LoopStateSchema (Get-Content -Raw $_.FullName | ConvertFrom-Json) } | Where-Object { $_.kind -ne 'issue' -and $_.phase -notin @('completed', 'blocked', 'handed-off') })
 }
 
 function Test-RequestedTaskTerminal {
@@ -540,7 +747,7 @@ try {
 
   $states = switch ($PSCmdlet.ParameterSetName) {
     'Pr' { @(Start-PrLoop $Pr) }
-    'Issue' { @(Start-IssueLoop $Issue) }
+    'Issue' { @(Start-IssueLoop $Issue $StagePhase $AllowFirstPush.IsPresent) }
     default { Get-WatchedStates }
   }
 

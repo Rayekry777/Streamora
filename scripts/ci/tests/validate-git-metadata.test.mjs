@@ -31,6 +31,10 @@ test('自动化提交必须包含完整且合法的 Loop Trailer', async () => {
     await validateCommitMessage(fixture('valid-automated-commit.txt').replace('Streamora-Loop-Attempt: 1', 'Streamora-Loop-Attempt: 0')),
     []
   );
+  const tooManyAttempts = await validateCommitMessage(
+    fixture('valid-automated-commit.txt').replace('Streamora-Loop-Attempt: 1', 'Streamora-Loop-Attempt: 6')
+  );
+  assert.ok(tooManyAttempts.some((error) => error.includes('Streamora-Loop-Attempt')));
 
   const errors = await validateCommitMessage(fixture('invalid-automated-commit.txt'));
   assert.ok(errors.some((error) => error.includes('Streamora-Loop-Root')));

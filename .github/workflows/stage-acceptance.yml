@@ -1,0 +1,185 @@
+name: 阶段验收
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled, unlabeled]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  authorize:
+    name: 阶段授权
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    outputs:
+      is_stage: ${{ steps.policy.outputs.is_stage }}
+      authorized: ${{ steps.policy.outputs.authorized }}
+      phase: ${{ steps.policy.outputs.phase }}
+      head_sha: ${{ steps.policy.outputs.head_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: 查询当前 SHA 的授权证据
+        id: evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          permission=""
+          behind_by="-1"
+          verified_sha=""
+          if [[ "$HEAD_BRANCH" =~ ^feature/phase-[0-9]+-.+ || "$HEAD_BRANCH" =~ ^agent/.+-phase-[0-9]+-.+ ]]; then
+            permission="$(gh api "repos/$REPOSITORY/collaborators/$ACTOR/permission" --jq .permission)"
+            behind_by="$(gh api "repos/$REPOSITORY/compare/master...$HEAD_SHA" --jq .behind_by)"
+            if [[ "$ACTION" == "labeled" && "$EVENT_LABEL" == "stage:ready" && "$IS_DRAFT" != "true" && ",$LABELS," == *,stage:ready,* ]]; then
+              for _ in $(seq 1 120); do
+                check_state="$(gh api "repos/$REPOSITORY/commits/$HEAD_SHA/check-runs" --jq '[.check_runs[] | select(.name == "功能验证门禁")][0] | if . == null then "missing" elif .status != "completed" then .status else .conclusion end')"
+                if [[ "$check_state" == "success" ]]; then
+                  verified_sha="$HEAD_SHA"
+                  break
+                fi
+                if [[ "$check_state" != "missing" && "$check_state" != "queued" && "$check_state" != "in_progress" && "$check_state" != "requested" && "$check_state" != "waiting" && "$check_state" != "pending" ]]; then
+                  break
+                fi
+                sleep 15
+              done
+            fi
+          fi
+          {
+            echo "permission=$permission"
+            echo "behind_by=$behind_by"
+            echo "verified_sha=$verified_sha"
+          } >> "$GITHUB_OUTPUT"
+      - name: 校验阶段策略
+        id: policy
+        continue-on-error: true
+        env:
+          STAGE_EVENT_ACTION: ${{ github.event.action }}
+          STAGE_EVENT_LABEL: ${{ github.event.label.name }}
+          STAGE_BASE_REF: ${{ github.base_ref }}
+          STAGE_HEAD_BRANCH: ${{ github.head_ref }}
+          STAGE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STAGE_DRAFT: ${{ github.event.pull_request.draft }}
+          STAGE_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          STAGE_ACTOR_PERMISSION: ${{ steps.evidence.outputs.permission }}
+          STAGE_BEHIND_BY: ${{ steps.evidence.outputs.behind_by }}
+          STAGE_VERIFIED_SHA: ${{ steps.evidence.outputs.verified_sha }}
+        run: node scripts/ci/stage-policy.mjs
+
+  stage-acceptance:
+    name: 虚拟机阶段验收
+    needs: authorize
+    if: needs.authorize.outputs.authorized == 'true'
+    runs-on: [self-hosted, linux, x64, streamora-core]
+    environment: stage-vm
+    concurrency:
+      group: stage-vm
+      cancel-in-progress: false
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.authorize.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 安装浏览器测试依赖
+        run: pnpm install --frozen-lockfile
+      - name: 执行升级与干净安装验收
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STREAMORA_REPOSITORY: ${{ github.repository }}
+          STREAMORA_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash scripts/ci/run-stage-acceptance.sh "${{ needs.authorize.outputs.phase }}" "${{ needs.authorize.outputs.head_sha }}"
+      - name: 收集阶段失败诊断
+        if: failure()
+        shell: bash
+        env:
+          STREAMORA_STAGE_PHASE: ${{ needs.authorize.outputs.phase }}
+        run: scripts/ci/collect-deploy-diagnostics.sh "${{ needs.authorize.outputs.head_sha }}" platform/stage-diagnostics
+      - name: 上传阶段验收证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-evidence
+          path: |
+            platform/stage-evidence
+            playwright-report/stage-*
+            test-results/stage-*
+          if-no-files-found: warn
+          retention-days: 14
+      - name: 上传阶段失败诊断
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-diagnostics
+          path: platform/stage-diagnostics
+          if-no-files-found: warn
+          retention-days: 14
+
+  stage-gate:
+    name: 阶段门禁
+    if: always()
+    needs: [authorize, stage-acceptance]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 汇总阶段验收
+        env:
+          AUTHORIZE_RESULT: ${{ needs.authorize.result }}
+          IS_STAGE: ${{ needs.authorize.outputs.is_stage }}
+          AUTHORIZED: ${{ needs.authorize.outputs.authorized }}
+          ACCEPTANCE_RESULT: ${{ needs.stage-acceptance.result }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$HEAD_BRANCH" =~ ^feature/phase-[0-9]+-.+ && ! "$HEAD_BRANCH" =~ ^agent/.+-phase-[0-9]+-.+ ]]; then
+            echo "This PR is not a stage branch; VM acceptance is not required."
+            exit 0
+          fi
+          if [[ "$AUTHORIZE_RESULT" != "success" || "$IS_STAGE" != "true" ]]; then
+            echo "Stage authorization could not be evaluated safely." >&2
+            exit 1
+          fi
+          if [[ "$AUTHORIZED" != "true" ]]; then
+            echo "The current stage Head SHA has not been authorized with stage:ready after functional verification." >&2
+            exit 1
+          fi
+          if [[ "$ACCEPTANCE_RESULT" != "success" ]]; then
+            echo "Stage VM acceptance ended with $ACCEPTANCE_RESULT." >&2
+            exit 1
+          fi
+          echo "Stage VM acceptance passed for the authorized Head SHA."

@@ -56,6 +56,6 @@ export const REQUIRED_PR_HEADINGS = [
 export const LOOP_TRAILERS = {
   'Streamora-Loop-Id': /^[a-z0-9][a-z0-9-]{2,80}$/,
   'Streamora-Loop-Root': /^[0-9a-f]{7,64}$/,
-  'Streamora-Loop-Attempt': /^(0|[1-9][0-9]*)$/,
+  'Streamora-Loop-Attempt': /^[0-5]$/,
   'Streamora-Loop-Mode': /^(feature|ci-repair|deploy-repair|root-cause)$/
 };

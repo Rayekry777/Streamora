@@ -9,22 +9,37 @@ fi
 deploy_sha="$1"
 output_dir="$2"
 repo_root="$(git rev-parse --show-toplevel)"
-compose_file="$repo_root/platform/compose/compose.yml"
-env_file="/opt/streamora/platform/compose/.env"
+compose_file="${STREAMORA_COMPOSE_FILE:-$repo_root/platform/compose/compose.yml}"
+compose_override="${STREAMORA_COMPOSE_OVERRIDE:-}"
+compose_profile="${STREAMORA_COMPOSE_PROFILE:-core}"
+compose_project="${STREAMORA_COMPOSE_PROJECT:-streamora}"
+env_file="${STREAMORA_ENV_FILE:-/opt/streamora/platform/compose/.env}"
 
 mkdir -p "$output_dir"
 
 sanitize() {
   sed -E \
     -e 's#(://)[^:/@[:space:]]+:[^@[:space:]]+@#\1***:***@#g' \
+    -e 's#([Aa]uthorization[":=[:space:]]+)([Bb]earer[[:space:]]+)?[^[:space:]",}]+#\1***#g' \
+    -e 's#("([Pp]assword|[Ss]ecret|[Tt]oken|[Aa]pi[_-]?[Kk]ey|[Aa]uthorization|[Cc]ookie)"[[:space:]]*:[[:space:]]*")[^"]*"#\1***"#g' \
     -e 's#([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Aa]uthorization|[Cc]ookie)([=:[:space:]]+)[^[:space:]]+#\1\2***#g'
 }
 
 compose() {
-  STREAMORA_IMAGE_TAG="$deploy_sha" docker compose --env-file "$env_file" -f "$compose_file" --profile core "$@"
+  local args=(docker compose --project-name "$compose_project" --env-file "$env_file" -f "$compose_file")
+  if [[ -n "$compose_override" ]]; then
+    args+=(-f "$compose_override")
+  fi
+  STREAMORA_COMPOSE_PROJECT="$compose_project" STREAMORA_IMAGE_TAG="$deploy_sha" "${args[@]}" --profile "$compose_profile" "$@"
 }
 
-printf '{"sha":"%s","collectedAt":"%s"}\n' "$deploy_sha" "$(date --iso-8601=seconds)" > "$output_dir/deployment.json"
+printf '{"sha":"%s","phase":"%s","project":"%s","collectedAt":"%s"}\n' \
+  "$deploy_sha" "${STREAMORA_STAGE_PHASE:-}" "$compose_project" "$(date --iso-8601=seconds)" > "$output_dir/deployment.json"
+
+stage_blocked_file="${HOME}/.local/state/streamora/stage-blocked.json"
+if [[ -r "$stage_blocked_file" ]]; then
+  cp "$stage_blocked_file" "$output_dir/stage-blocked.json"
+fi
 
 if [[ -r "$env_file" ]]; then
   compose ps --all > "$output_dir/compose-ps.txt" 2>&1 || true

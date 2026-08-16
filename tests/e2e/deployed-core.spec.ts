@@ -5,7 +5,7 @@ const adminBaseUrl = process.env.E2E_ADMIN_BASE_URL ?? 'http://127.0.0.1:3001'
 const adminLogin = process.env.E2E_ADMIN_LOGIN ?? 'admin'
 const adminPassword = process.env.E2E_ADMIN_PASSWORD ?? '123456'
 
-test('用户端注册后切换个人宠物，且不能使用管理员会话', async ({ page }) => {
+test('用户端注册后切换个人宠物，且不能使用管理员会话', { tag: ['@smoke', '@phase-2'] }, async ({ page }) => {
   const login = `ci-e2e-${Date.now()}-${test.info().workerIndex}`
 
   await page.goto('/')
@@ -35,7 +35,7 @@ test('用户端注册后切换个人宠物，且不能使用管理员会话', as
   expect(userSessionResponse.status()).toBe(401)
 })
 
-test('管理端登录后可读取运营概览，且不能使用用户会话', async ({ page }) => {
+test('管理端登录后可读取运营概览，且不能使用用户会话', { tag: ['@smoke', '@phase-2'] }, async ({ page }) => {
   await page.goto(`${adminBaseUrl}/login`)
   await page.getByLabel('管理员登录名').fill(adminLogin)
   await page.getByLabel('密码').fill(adminPassword)

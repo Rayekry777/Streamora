@@ -2,8 +2,11 @@
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
-compose_file="$repo_root/platform/compose/compose.yml"
-env_file="/opt/streamora/platform/compose/.env"
+compose_file="${STREAMORA_COMPOSE_FILE:-$repo_root/platform/compose/compose.yml}"
+compose_override="${STREAMORA_COMPOSE_OVERRIDE:-}"
+compose_profile="${STREAMORA_COMPOSE_PROFILE:-core}"
+compose_project="${STREAMORA_COMPOSE_PROJECT:-streamora}"
+env_file="${STREAMORA_ENV_FILE:-/opt/streamora/platform/compose/.env}"
 
 if [[ ! -r "$env_file" ]]; then
   echo "The VM-local Compose environment file is missing or unreadable." >&2
@@ -26,7 +29,11 @@ read_env_value() {
 }
 
 compose() {
-  docker compose --env-file "$env_file" -f "$compose_file" --profile core "$@"
+  local args=(docker compose --project-name "$compose_project" --env-file "$env_file" -f "$compose_file")
+  if [[ -n "$compose_override" ]]; then
+    args+=(-f "$compose_override")
+  fi
+  STREAMORA_COMPOSE_PROJECT="$compose_project" "${args[@]}" --profile "$compose_profile" "$@"
 }
 
 web_address="$(compose port web 80)"
@@ -39,6 +46,11 @@ if [[ -z "$web_address" || -z "$admin_address" || -z "$admin_login" || -z "$admi
   exit 78
 fi
 
+playwright_args=(test --config playwright.config.ts)
+if [[ -n "${STREAMORA_E2E_GREP:-}" ]]; then
+  playwright_args+=(--grep "$STREAMORA_E2E_GREP")
+fi
+
 docker run --rm \
   --network host \
   --ipc=host \
@@ -48,7 +60,9 @@ docker run --rm \
   -e E2E_ADMIN_BASE_URL="http://${admin_address}" \
   -e E2E_ADMIN_LOGIN="$admin_login" \
   -e E2E_ADMIN_PASSWORD="$admin_password" \
+  -e STREAMORA_E2E_REPORT_SUFFIX="${STREAMORA_E2E_REPORT_SUFFIX:-deployed}" \
+  -e CI=true \
   -v "$repo_root:/workspace" \
   -w /workspace \
   mcr.microsoft.com/playwright:v1.62.0-noble \
-  /bin/bash -lc '/workspace/node_modules/.bin/playwright test --config playwright.config.ts'
+  /workspace/node_modules/.bin/playwright "${playwright_args[@]}"

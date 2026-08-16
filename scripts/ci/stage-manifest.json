@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "stages": {
+    "3": {
+      "phase": 3,
+      "composeServices": [
+        "postgres",
+        "postgres-privileges-init",
+        "redis",
+        "minio",
+        "nacos",
+        "rocketmq-namesrv",
+        "rocketmq-volume-init",
+        "rocketmq-broker",
+        "gateway-service",
+        "admin-service",
+        "identity-service",
+        "user-service",
+        "video-service",
+        "media-service",
+        "transcode-worker",
+        "playback-service",
+        "pet-service",
+        "moderation-service",
+        "web",
+        "admin-web"
+      ],
+      "dependencyContainers": ["postgres", "redis", "minio", "nacos", "rocketmq-namesrv", "rocketmq-broker"],
+      "backendTests": [
+        "services/gateway-service",
+        "services/identity-service",
+        "services/admin-service",
+        "services/pet-service",
+        "services/video-service",
+        "services/media-service",
+        "services/transcode-worker",
+        "services/playback-service",
+        "services/moderation-service"
+      ],
+      "playwrightTestDirectory": "tests/e2e",
+      "testDataVersion": "phase-3-v1",
+      "minimumResources": { "cpu": 8, "memoryGb": 16, "diskGb": 80 }
+    }
+  }
+}
