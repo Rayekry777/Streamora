@@ -7,13 +7,14 @@ description: 管理 Streamora 项目的阶段推进、里程碑门禁、验收�
 
 ## 执行顺序
 
-1. 完整读取 `docs/project/PROJECT_ROADMAP.md`、`docs/development/BACKEND_DEVELOPMENT.md` 和当前阶段验收文件。
-2. 检查工作区、已有实现、验证记录和用户未提交改动，以事实校正阶段状态。
-3. 只执行当前里程碑；按“契约、后端主链路、用户端与管理端、联调、验收”推进。
-4. 涉及新方案、依赖或组件时，完整读取并执行 [开源方案优先政策](../../../docs/development/OPEN_SOURCE_ADOPTION_POLICY.md)，先调研成熟开源方案并记录结论。
-5. 使用 [里程碑门禁](references/milestone-gates.md) 判断是否达到出口条件。
-6. 使用 [状态规则](references/status-rules.md) 更新状态，禁止跳过“待验收”。
-7. 按 [交付报告](references/delivery-report.md) 写入阶段验收文件并向用户报告。
+1. 先读取 [本机工具定位](references/local-tooling.md)，直接使用固定命令执行本地 GitHub、pnpm 和 Maven 操作。
+2. 完整读取 `docs/project/PROJECT_ROADMAP.md`、`docs/development/BACKEND_DEVELOPMENT.md` 和当前阶段验收文件。
+3. 检查工作区、已有实现、验证记录和用户未提交改动，以事实校正阶段状态。
+4. 只执行当前里程碑；按“契约、后端主链路、用户端与管理端、联调、验收”推进。
+5. 涉及新方案、依赖或组件时，完整读取并执行 [开源方案优先政策](../../../docs/development/OPEN_SOURCE_ADOPTION_POLICY.md)，先调研成熟开源方案并记录结论。
+6. 使用 [里程碑门禁](references/milestone-gates.md) 判断是否达到出口条件。
+7. 使用 [状态规则](references/status-rules.md) 更新状态，禁止跳过“待验收”。
+8. 按 [交付报告](references/delivery-report.md) 写入阶段验收文件并向用户报告。
 
 ## 提交前 Loop Engineering
 
@@ -25,7 +26,7 @@ description: 管理 Streamora 项目的阶段推进、里程碑门禁、验收�
 - 每个功能提交必须启动一个独立子 Agent 作为质量代理。子 Agent 必须独立复现问题、运行适配验证，并直接完成同一功能范围内的最小修复；不得提交、推送、还原其他人的改动或扩展需求。
 - 验证或审阅失败时，保留同一功能范围，修复后再次验证；直到通过才允许提交。外部凭据、基础设施或权限阻塞必须如实报告，不得伪造通过或创建空洞提交。
 - 前端、后端必须分开形成提交；文档、基础设施和工作流仅在无法归属时单独提交。每一笔提交必须为中文 Conventional Commit，正文必须包含“功能明细”“验证结果”“未运行项”“阶段状态”四个区块。
-- GitHub Actions 负责远端独立验证、部署和诊断。远端失败后，主 Agent 读取诊断并开启新的本地修复循环；GitHub 内的模型修复仅作为已配置密钥后的可选兜底，不能替代本地修复循环。
+- GitHub Actions 负责远端独立验证、部署和诊断。远端失败后，主 Agent 使用本机已认证 Codex CLI 在隔离副本中读取诊断并开启修复循环；不使用 GitHub 内模型修复。
 
 ## 强制约束
 

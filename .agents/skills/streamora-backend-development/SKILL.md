@@ -7,11 +7,12 @@ description: 设计、实现、修复、审查和验证 Streamora 的 Java 21、
 
 ## 开始前
 
-1. 完整读取 `docs/development/BACKEND_DEVELOPMENT.md` 和 `docs/data/DATABASE_SCHEMA.md`。
-2. 读取与任务相关的分类契约：服务边界、API、事件和数据归属。
-3. 检查相关源码、配置、迁移、测试和 Git 状态，保留用户改动。
-4. 按 [服务边界导航](references/service-boundaries.md) 确认唯一写入方。
-5. 涉及新的框架、库、基础设施、中间件、媒体处理或安全方案时，完整读取并执行 [开源方案优先政策](../../../docs/development/OPEN_SOURCE_ADOPTION_POLICY.md)。先从官方资料和源仓库调研成熟方案；无可采纳方案才可自研，并把结论写入阶段验收或设计记录。
+1. 读取 [本机工具定位](../streamora-delivery-workflow/references/local-tooling.md)，本地 Maven 验证直接使用 `.\mvnw.cmd`。
+2. 完整读取 `docs/development/BACKEND_DEVELOPMENT.md` 和 `docs/data/DATABASE_SCHEMA.md`。
+3. 读取与任务相关的分类契约：服务边界、API、事件和数据归属。
+4. 检查相关源码、配置、迁移、测试和 Git 状态，保留用户改动。
+5. 按 [服务边界导航](references/service-boundaries.md) 确认唯一写入方。
+6. 涉及新的框架、库、基础设施、中间件、媒体处理或安全方案时，完整读取并执行 [开源方案优先政策](../../../docs/development/OPEN_SOURCE_ADOPTION_POLICY.md)。先从官方资料和源仓库调研成熟方案；无可采纳方案才可自研，并把结论写入阶段验收或设计记录。
 
 ## 实现流程
 
