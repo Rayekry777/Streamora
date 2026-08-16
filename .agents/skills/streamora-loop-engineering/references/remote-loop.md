@@ -1,26 +1,17 @@
-# 远端循环规则
+# 远端交付规则
 
-## 状态
-
-使用 `agent:ready`、`agent:running`、`agent:repairing`、`agent:root-cause`、`agent:blocked`、`agent:done`。Issue 或 PR 的隐藏状态注释保存 Loop-Id、根提交、分支、尝试、运行 URL 和终止原因。
-
-## 提交元数据
-
-每个自动提交必须有“功能明细”“验证结果”“未运行项”“阶段状态”四个正文区块，并追加：
+## 状态顺序
 
 ```text
-Streamora-Loop-Id: <id>
-Streamora-Loop-Root: <sha>
-Streamora-Loop-Attempt: <0-4，功能根提交为 0>
-Streamora-Loop-Mode: <feature|ci-repair|deploy-repair|root-cause>
+用户推送 -> 功能验证 -> 阶段验收（阶段 PR） -> 用户确认 -> squash 合并 -> 晋升校验 -> 手动部署 -> 结果汇报
 ```
 
-## 修复顺序
+- 普通 PR 只需要功能验证。
+- 阶段 PR 必须是 `feature/phase-<N>-<主题>`，当前 Head SHA 必须通过“功能验证门禁”，PR 非 Draft 且 `master...Head` 的 `behind_by` 为 0。
+- 阶段验收由“验证”工作流成功事件自动触发，拒绝旧 SHA、Fork PR 和旧阶段证据。
+- `stage-promotion.yml` 只校验验收候选树与 squash 后 `master` 树一致，并登记健康 SHA；不自动合并或部署。
+- `deploy-core.yml` 只接受 `workflow_dispatch`。Codex 只有在用户确认后才触发，并等待部署和浏览器 E2E 的最终结论。
 
-1. GitHub Actions 失败后上传脱敏诊断；本机守护下载最新诊断并拒绝过期 SHA。
-2. 本机 Codex CLI 在 `D:\aitool\loop-state` 隔离副本中生成最小修复，执行禁止路径与受影响本地验证，再提交推送。
-3. 首次失败立即修复，同一根提交最多三轮。无安全补丁、边界/本地验证失败或第三轮仍失败时创建 `agent:blocked` Issue，不再自动重试。
+## 失败处理
 
-## 自动合并
-
-正常 PR 与修复 PR 都只能在最新 SHA 全部必需检查成功后由本机守护启用 squash 自动合并。守护必须查询实际状态，不能只依赖旧事件结论。
+任何功能、阶段、晋升或部署失败都进入停止状态。保留 GitHub 日志和脱敏 Artifact，向用户报告运行 URL、失败类别、SHA 和下一步所需的本地修复；不创建 PR、不自动提交、不自动推送、不自动重试。

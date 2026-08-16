@@ -23,19 +23,6 @@
 - 风险：
 - 回滚方式：
 
-## Loop 证据
-
-<!-- streamora-loop
-loop_id:
-root_commit:
-branch_decision:
-attempt: 0
-mode: feature
-source:
--->
-
--
-
 ## 阶段状态
 
 - 阶段 N：进行中 / 待验收

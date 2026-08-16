@@ -1,0 +1,42 @@
+services:
+  postgres:
+    ports:
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    ports:
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${REDIS_PORT:-6379}:6379"
+
+  nacos:
+    ports:
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${NACOS_PORT:-8848}:8848"
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${NACOS_GRPC_PORT:-9848}:9848"
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${NACOS_GRPC_CLIENT_PORT:-9849}:9849"
+
+  rocketmq-namesrv:
+    ports:
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+
+  rocketmq-broker:
+    command:
+      - sh
+      - -c
+      - mkdir -p /home/rocketmq/logs/rocketmqlogs && exec sh mqbroker -n rocketmq-namesrv:9876 -c /home/rocketmq/conf/broker-dev-vm.conf
+    ports:
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${ROCKETMQ_BROKER_REMOTING_PORT:-10909}:10909"
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${ROCKETMQ_BROKER_PORT:-10911}:10911"
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${ROCKETMQ_BROKER_HA_PORT:-10912}:10912"
+    volumes:
+      - rocketmq-broker-store:/home/rocketmq/store
+      - ./rocketmq/broker-dev-vm.conf:/home/rocketmq/conf/broker-dev-vm.conf:ro
+
+  minio:
+    ports:
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${MINIO_API_PORT:-9000}:9000"
+      - "${STREAMORA_DEV_BIND_ADDRESS:?请在 .env.dev 中设置 STREAMORA_DEV_BIND_ADDRESS}:${MINIO_CONSOLE_PORT:-9001}:9001"
+
+# internal 网络会阻断 VM 主机到 PostgreSQL 和 Redis 的端口转发；dev 需要让
+# Windows IDEA 通过 VM NAT 地址访问这些中间件。sim 仍保留基础文件中的 internal 隔离。
+networks:
+  streamora-data:
+    internal: false

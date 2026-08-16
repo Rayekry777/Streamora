@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
+const reportSuffix = process.env.STREAMORA_E2E_REPORT_SUFFIX ?? 'deployed'
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -7,8 +9,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: [
-    ['html', { outputFolder: 'playwright-report/deployed', open: 'never' }],
-    ['junit', { outputFile: 'test-results/deployed/e2e-junit.xml' }],
+    ['html', { outputFolder: `playwright-report/${reportSuffix}`, open: 'never' }],
+    ['junit', { outputFile: `test-results/${reportSuffix}/e2e-junit.xml` }],
     ['list'],
   ],
   use: {

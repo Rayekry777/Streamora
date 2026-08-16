@@ -1,0 +1,42 @@
+name: Docker smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Comma-separated Compose services; leave empty for infrastructure only.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: 手动 Docker smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: 启动临时运行时验证
+        shell: bash
+        run: bash scripts/ci/run-functional-docker-tests.sh "${{ inputs.services }}"
+      - name: 收集 Docker 诊断
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p docker-smoke-diagnostics
+          docker ps -a > docker-smoke-diagnostics/containers.txt
+          docker images > docker-smoke-diagnostics/images.txt
+      - name: 上传 Docker 诊断
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-smoke-diagnostics
+          path: docker-smoke-diagnostics
+          if-no-files-found: warn
+          retention-days: 14

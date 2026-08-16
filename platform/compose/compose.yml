@@ -1,4 +1,4 @@
-name: streamora
+name: ${STREAMORA_COMPOSE_PROJECT:-streamora}
 
 x-infra-profiles: &infra-profiles
   - infra
@@ -101,8 +101,8 @@ services:
     volumes:
       - minio-data:/data
     ports:
-      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
-      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${STREAMORA_BIND_ADDRESS:-127.0.0.1}:${MINIO_API_PORT:-9000}:9000"
+      - "${STREAMORA_BIND_ADDRESS:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
       interval: 10s
@@ -127,7 +127,7 @@ services:
       JVM_XMX: 512m
       JVM_XMN: 256m
     ports:
-      - "127.0.0.1:${NACOS_PORT:-8848}:8848"
+      - "${STREAMORA_BIND_ADDRESS:-127.0.0.1}:${NACOS_PORT:-8848}:8848"
     expose:
       - "9848"
       - "9849"
@@ -216,7 +216,7 @@ services:
       - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+      - "${STREAMORA_BIND_ADDRESS:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
     networks:
       - streamora-app
 
@@ -260,7 +260,7 @@ services:
       - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
     ports:
-      - "127.0.0.1:${GRAFANA_PORT:-3002}:3000"
+      - "${STREAMORA_BIND_ADDRESS:-127.0.0.1}:${GRAFANA_PORT:-3002}:3000"
     depends_on:
       - prometheus
       - loki
@@ -551,7 +551,7 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${WEB_PORT:-3000}:80"
+      - "${STREAMORA_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:80"
     depends_on:
       gateway-service:
         condition: service_healthy
@@ -566,7 +566,7 @@ services:
       dockerfile: apps/admin-web/Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${ADMIN_WEB_PORT:-3001}:80"
+      - "${STREAMORA_BIND_ADDRESS:-127.0.0.1}:${ADMIN_WEB_PORT:-3001}:80"
     depends_on:
       gateway-service:
         condition: service_healthy
@@ -575,9 +575,9 @@ services:
 
 networks:
   streamora-app:
-    name: streamora-app
+    name: ${STREAMORA_COMPOSE_PROJECT:-streamora}-app
   streamora-data:
-    name: streamora-data
+    name: ${STREAMORA_COMPOSE_PROJECT:-streamora}-data
     internal: true
 
 volumes:

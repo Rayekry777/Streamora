@@ -7,7 +7,7 @@
 - 端口固定在 8080–8096；所有服务提供 Actuator liveness、readiness 和 Prometheus 端点。
 - 本地默认关闭 Nacos，`compose` Profile 连接 `nacos:8848` 并使用 Dubbo Triple。
 - 当前没有业务表或 Flyway 迁移；PostgreSQL 初始化脚本只创建 pgvector 扩展、15 个有状态服务的独立角色与 schema。
-- 当前机器未安装 Docker，因此本轮已完成 Maven 运行测试和 Compose/YAML 静态校验，尚未执行镜像与容器运行验证。
+- 本地 IDEA 联调使用独立 dev Ubuntu VM；sim Ubuntu VM 由 GitHub 自托管 Runner 负责 Core 部署。Windows 不依赖 Docker Desktop 运行 Streamora。
 
 ## 2. 文件映射
 
@@ -41,7 +41,7 @@ Dockerfile 确定性复制 `services/<service>/target/<service>.jar`，不会用
 
 ## 4. Compose 三档环境
 
-先安装 Docker Desktop，并建议将 Docker 数据目录放到 D 盘。然后：
+在 dev VM 或 sim VM 的仓库目录中使用 Docker Engine，然后：
 
 ```powershell
 Set-Location platform/compose
@@ -84,7 +84,7 @@ docker compose exec gateway-service wget -qO- http://127.0.0.1:8080/actuator/hea
 docker compose exec identity-service wget -qO- http://127.0.0.1:8082/actuator/health/readiness
 ```
 
-用户入口默认是 `http://127.0.0.1:3000`，管理入口默认是 `http://127.0.0.1:3001`。
+sim 用户入口通过 SSH 隧道映射为 `http://127.0.0.1:3000`，管理入口为 `http://127.0.0.1:3001`；dev VM 不运行 Web 或 Admin。
 
 ## 7. JVM、停止与资源
 
@@ -107,6 +107,7 @@ docker compose exec identity-service wget -qO- http://127.0.0.1:8082/actuator/he
 - `.env`、Key、Token、Cookie 与用户记忆未进入镜像和日志。
 - 网关、数据库和 Redis 未向公网直接发布。
 - Prometheus 能抓取服务指标，Grafana 数据源可访问。
+- GitHub 部署仅在用户确认合并后手动触发；失败保留部署诊断和安全回滚结果，不自动修复或重试。
 
 ## 10. 常见问题
 

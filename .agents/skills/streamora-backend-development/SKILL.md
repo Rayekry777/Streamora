@@ -24,6 +24,12 @@ description: 设计、实现、修复、审查和验证 Streamora 的 Java 21、
 6. 按 [后端验证](references/backend-verification.md) 执行最小充分验证并记录结果。
 7. 仅当实现、权限、校验、测试、契约、编译和文档全部一致时标记“已实现”。
 
+## 本地联调
+
+- Windows 本地开发使用 dev Ubuntu VM（`192.168.126.129`）运行 PostgreSQL、Redis、Nacos、RocketMQ 和 MinIO；IDEA 只启动当前调试的 Java 服务。sim Core VM（`192.168.126.128`）仅用于已部署环境、阶段验收和浏览器 E2E。
+- 真实 PostgreSQL、Nacos 和 Dubbo 联调使用 `compose,idea` Profile 与 dev VM 地址；未实际接入 Redis、RocketMQ 或对象存储的服务不得把容器可用写成业务联调已通过。
+- 容器、跨进程 RPC 或真实媒体验证失败时，记录真实阻塞并保留服务内 Maven 验证，不以 H2 测试替代真实环境结论。
+
 ## Agent 特有约束
 
 - 业务层只依赖 `ModelProvider` 和 `AgentRuntime` 项目接口。

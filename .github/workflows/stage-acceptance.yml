@@ -1,0 +1,137 @@
+name: 阶段验收
+
+on:
+  workflow_run:
+    workflows: [验证]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  authorize:
+    name: 确认阶段候选
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-24.04
+    outputs:
+      authorized: ${{ steps.policy.outputs.authorized }}
+      phase: ${{ steps.policy.outputs.phase }}
+      head_sha: ${{ steps.policy.outputs.head_sha }}
+      pr_number: ${{ steps.candidate.outputs.pr_number }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: master
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: 查询当前阶段 PR
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_line="$(gh api "repos/$REPOSITORY/commits/$HEAD_SHA/pulls" --paginate --jq '[.[] | select(.state == "open" and .base.ref == "master" and .head.repo.full_name == .base.repo.full_name)][0] | [.number, .head.ref, .head.sha, .draft] | @tsv')"
+          pr_number=""
+          pr_branch=""
+          pr_sha=""
+          pr_draft="true"
+          if [[ -n "$pr_line" ]]; then
+            IFS=$'\t' read -r pr_number pr_branch pr_sha pr_draft <<< "$pr_line"
+          fi
+          if [[ "$pr_branch" != "$HEAD_BRANCH" || "$pr_sha" != "$HEAD_SHA" ]]; then
+            pr_number=""
+            pr_draft="true"
+          fi
+          behind_by="-1"
+          if [[ -n "$pr_number" ]]; then
+            behind_by="$(gh api "repos/$REPOSITORY/compare/master...$HEAD_SHA" --jq .behind_by)"
+          fi
+          {
+            echo "pr_number=$pr_number"
+            echo "draft=$pr_draft"
+            echo "behind_by=$behind_by"
+          } >> "$GITHUB_OUTPUT"
+      - name: 校验自动阶段验收条件
+        id: policy
+        continue-on-error: true
+        env:
+          STAGE_BASE_REF: master
+          STAGE_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          STAGE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          STAGE_DRAFT: ${{ steps.candidate.outputs.draft }}
+          STAGE_BEHIND_BY: ${{ steps.candidate.outputs.behind_by }}
+          STAGE_VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/ci/stage-policy.mjs
+
+  stage-acceptance:
+    name: 虚拟机阶段验收
+    needs: authorize
+    if: needs.authorize.outputs.authorized == 'true'
+    runs-on: [self-hosted, linux, x64, streamora-core]
+    environment: stage-vm
+    concurrency:
+      group: stage-vm
+      cancel-in-progress: false
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.authorize.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 安装浏览器测试依赖
+        run: pnpm install --frozen-lockfile
+      - name: 执行升级与干净安装验收
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STREAMORA_REPOSITORY: ${{ github.repository }}
+          STREAMORA_PR_NUMBER: ${{ needs.authorize.outputs.pr_number }}
+        run: bash scripts/ci/run-stage-acceptance.sh "${{ needs.authorize.outputs.phase }}" "${{ needs.authorize.outputs.head_sha }}"
+      - name: 收集阶段失败诊断
+        if: failure()
+        shell: bash
+        env:
+          STREAMORA_STAGE_PHASE: ${{ needs.authorize.outputs.phase }}
+        run: scripts/ci/collect-deploy-diagnostics.sh "${{ needs.authorize.outputs.head_sha }}" platform/stage-diagnostics
+      - name: 上传阶段验收证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-evidence
+          path: |
+            platform/stage-evidence
+            playwright-report/stage-*
+            test-results/stage-*
+          if-no-files-found: warn
+          retention-days: 14
+      - name: 上传阶段失败诊断
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-diagnostics
+          path: platform/stage-diagnostics
+          if-no-files-found: warn
+          retention-days: 14

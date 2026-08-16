@@ -27,12 +27,14 @@
 | 需求 | 候选与证据 | 结论 |
 |---|---|---|
 | S3 兼容对象存储客户端 | [MinIO Java SDK](https://github.com/minio/minio-java) 支持 S3 兼容对象存储且为 Apache-2.0；[AWS SDK for Java 2.x](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/java_s3_code_examples.html) 提供分片上传、预签名 URL 和异步客户端 | 采用 AWS SDK for Java 2.x 的 S3 API，通过 `ObjectStore` 端口隔离，兼容 SeaweedFS、Ceph RGW 和云 S3 |
-| 自托管对象存储 | [SeaweedFS](https://github.com/seaweedfs/seaweedfs) 为 Apache-2.0 并提供 S3 API；[Ceph RGW](https://docs.ceph.com/en/latest/radosgw/index.html) 提供 S3 兼容网关；现有 MinIO 社区服务端为 AGPLv3 且仓库已归档 | 容器联调前将 MinIO 替换为 SeaweedFS；Ceph 作为生产规模化候选。MinIO 不纳入默认封闭演示运行栈 |
+| 自托管对象存储 | [SeaweedFS](https://github.com/seaweedfs/seaweedfs) 为 Apache-2.0 并提供 S3 API；[Ceph RGW](https://docs.ceph.com/en/latest/radosgw/index.html) 提供 S3 兼容网关；现有 MinIO 社区服务端为 AGPLv3 且仓库已归档 | 本地 IDEA 联调按计划使用 MinIO；生产默认仍评估 SeaweedFS，Ceph 作为规模化候选。不得把本地 MinIO 可用写成生产选型结论 |
 | HLS 转码 | [FFmpeg](https://ffmpeg.org/documentation.html) 提供媒体处理和 HLS muxer；[Jaffree](https://github.com/kokorin/Jaffree) 是 Apache-2.0 的 Java FFmpeg 命令包装器 | 采用 FFmpeg，Worker 通过 `HlsTranscodeExecutor` 端口调用；Jaffree `2024.08.29` 已通过编译和 Worker 编排 PoC。正式镜像使用 LGPL 兼容构建，禁止引入 GPL 编码库 |
 
-隔离方式：业务层不依赖 AWS、SeaweedFS 或 FFmpeg 类型；对象存储和转码均通过基础设施适配器接入。当前主机无 Docker，S3/FFmpeg 适配器的真实集成验证待容器环境可用后补充。
+隔离方式：业务层不依赖 AWS、SeaweedFS 或 FFmpeg 类型；对象存储和转码均通过基础设施适配器接入。Windows IDEA 通过 dev VM 的真实中间件联调；S3/FFmpeg 适配器的真实集成证据仍需单独记录。
 
 ## 验证证据
+
+> 本表只登记已经实际执行的检查；dev VM 中间件健康、Windows JVM 连通性和真实适配器结果未完成验证前，不得填写中间件联调通过。
 
 | 检查项 | 实际执行 | 结果 |
 |---|---|---|
@@ -56,8 +58,8 @@
 
 ## 已知限制
 
-- 当前设备未安装 Docker，不能进行 MinIO、PostgreSQL、RocketMQ、Nacos 和 FFmpeg 容器的真实跨进程联调。
-- 封闭演示可先使用 H2 PostgreSQL 兼容模式和可替换的对象存储/转码适配器覆盖服务内集成测试；容器化联调必须在 Docker 可用后补充。
+- 本地中间件运行在 dev Ubuntu VM `192.168.126.129`，使用 `compose.dev-vm.yml` 和 Compose 项目 `streamora-dev`；启动、端口和健康结果以 `docs/operations/DEV_INFRA_SERVER.md` 的实际记录为准。
+- sim Ubuntu VM `192.168.126.128` 继续承载已部署 Core、阶段验收和浏览器 E2E；不得把 sim 的容器可用性写成本地 IDEA 联调证据。
 - 当前主机未安装 FFmpeg，因此 Jaffree 仅完成编译与编排测试；HLS 分片、封面截图、字幕提取和真实 SeaweedFS/S3 发布均不得视为已验证。
 
 ## 用户验收

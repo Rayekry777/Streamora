@@ -106,10 +106,11 @@ implementationStatus: 阶段 2 已完成；阶段 3 进行中，视频读取契�
 | 2026-08-16 | media-service 上传主链路 | H2 PostgreSQL 兼容模式下的 Flyway、幂等会话、完成、转码任务和 Outbox 集成测试 | 通过；真实 S3、Identity RPC、RocketMQ 与 FFmpeg 集成待 Docker 环境补充 |
 | 2026-08-16 | 转码任务租约与 Worker | Protobuf Triple 生成，media-service V1-V2 Flyway、任务领取、完成回报、`media.asset.transcoded.v1` Outbox 与 Worker 编排测试 | 通过；本机未安装 FFmpeg 和 Docker，尚未执行真实媒体转码或跨进程 Dubbo |
 | 2026-08-16 | 视频与播放公开读取 | video/playback Flyway V1、首页内容流、公开视频详情、播放清单与错误信封的 MockMvc 集成测试 | 6 个测试通过；H2 PostgreSQL 兼容模式验证，真实 PostgreSQL、Gateway、对象存储及跨进程服务联调待 Docker 环境补充 |
+| 2026-08-17 | dev VM 与 IDEA 联调 | `Start-StreamoraInfra.ps1`、`Test-StreamoraInfra.ps1`；`identity-service` 使用 `compose,idea` 启动 | dev PostgreSQL、Redis、Nacos、RocketMQ、MinIO 健康且 Windows 端口可达；identity Flyway、健康端点和 dev Nacos Dubbo 注册通过。 |
 
 ## 9. 已确定风险
 
-- Docker Desktop 尚未安装，阶段 1 可生成配置和完成本机构建，但容器运行验收需要先安装 Docker。
+- Windows IDEA 使用 dev Ubuntu VM 的 Docker Engine；sim Ubuntu VM 由自托管 Runner 负责 Core 部署。两套真实环境的运行结果必须分别记录，不能用 H2 或 sim 结果替代 dev 联调证据。
 - 正式 Live2D 模型未提供，只能先验证渲染接口与占位降级。
 - 微服务数量对 MVP 偏多，阶段 1 必须提供 infra/core/full 配置以控制本地资源。
 - Qwen 与 Spring AI Alibaba 适配器必须被项目接口隔离，避免供应商和框架升级扩散到业务层。
