@@ -116,7 +116,8 @@ jobs:
           state_dir="${HOME}/.local/state/streamora"
           install -d -m 700 "$state_dir"
           install -m 600 stage-promotion-record.json "$state_dir/promoted-master.json"
-          # shellcheck disable=SC2016 -- JavaScript template literals are evaluated by Node.
+          # JavaScript template literals below are evaluated by Node.
+          # shellcheck disable=SC2016
           STATE_DIR="$state_dir" node -e '
             const fs = require("fs");
             const statePath = `${process.env.STATE_DIR}/last-healthy.json`;

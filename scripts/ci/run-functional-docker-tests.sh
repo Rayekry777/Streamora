@@ -64,6 +64,6 @@ while IFS= read -r container_id; do
     echo "Container $container_id exited with code $exit_code" >&2
     exit 1
   fi
-done < <(compose --profile full ps -q "${runtime_services[@]}")
+done < <(compose --profile infra --profile full ps -q "${runtime_services[@]}")
 
 echo "Functional Docker verification passed for project $project_name."
