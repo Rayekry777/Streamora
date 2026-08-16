@@ -11,6 +11,19 @@
 
 不得把前端与后端混入同一功能提交。不得携带无关的用户改动。
 
+## 分支主线
+
+每次开发前依次执行：
+
+```powershell
+git switch master
+git fetch origin --prune
+git pull --ff-only
+git switch -c feature/<领域>-<主题>
+```
+
+`master` 只跟踪 `origin/master`，禁止在其上开发、提交、merge 或 rebase。人工 PR 来源只能是 `feature/*`，本机自动修复使用 `agent/*`，部署修复使用 `deploy-repair/*`；三类分支均只通过 PR squash 合并到 `master`。发现本地 `master` 分叉时，先归档或移出未合并工作，不能直接合并旧主线。
+
 ## 循环协议
 
 1. 主 Agent 描述本次提交的边界、预期行为和所需验证，并完成主实现。

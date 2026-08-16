@@ -10,11 +10,13 @@ description: 管理 Streamora 的自动 Git 提交、首次推送门禁、PR 创
 ## 本地循环
 
 1. 先读取 [本机工具定位](../streamora-delivery-workflow/references/local-tooling.md)，GitHub 操作直接使用固定 GitHub CLI 路径。
-2. 为任务生成 `Loop-Id`，按用户端、管理端、后端、契约或基础设施划分提交边界。
-3. 检查当前分支、工作区和活动任务。仅当分支非受保护、无无关改动且属于当前任务时复用；否则创建 `agent/<loop-id>-<slug>`。
-4. 实现后启动独立质量 Agent。质量 Agent 可在相同范围内修复并复验，但不得提交或推送。
-5. 通过门禁后自动创建中文 Conventional Commit，包含四个正文区块和 Loop Trailer。
-6. 对话任务在首次推送前请求用户确认；Issue 的 `agent:ready` 标签即为首次推送授权。
+2. `master` 只跟踪 `origin/master`：先执行 `git fetch origin --prune` 与 `git pull --ff-only`，禁止在 `master` 上开发、提交、merge 或 rebase。若已分叉，先归档或移出未合并工作再同步主线。
+3. 人工功能从同步后的主线创建 `feature/<领域>-<主题>`；本机自动任务使用 `agent/<loop-id>-<slug>`，部署修复保留 `deploy-repair/*`。PR 只能以这三类来源分支合并到 `master`。
+4. 为任务生成 `Loop-Id`，按用户端、管理端、后端、契约或基础设施划分提交边界。
+5. 检查当前分支、工作区和活动任务。仅当分支非受保护、无无关改动且属于当前任务时复用；否则创建 `agent/<loop-id>-<slug>`。
+6. 实现后启动独立质量 Agent。质量 Agent 可在相同范围内修复并复验，但不得提交或推送。
+7. 通过门禁后自动创建中文 Conventional Commit，包含四个正文区块和 Loop Trailer。
+8. 对话任务在首次推送前请求用户确认；Issue 的 `agent:ready` 标签即为首次推送授权。
 
 ## 远端循环
 
