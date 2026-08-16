@@ -36,6 +36,12 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: 校验 PR 分支策略
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: node scripts/ci/validate-branch-policy.mjs "$BASE_REF" "$HEAD_BRANCH"
+
       - name: 安装治理依赖
         run: pnpm install --frozen-lockfile
 
