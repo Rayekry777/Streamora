@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   MAX_REPAIR_ATTEMPTS,
+  applyStageEvidence,
   classifyWorkflowRun,
   createLoopState,
   handoffIssueState,
@@ -10,6 +11,8 @@ import {
   isWatchableState,
   nextRepairAttempt,
   repairBranchName,
+  requiresStageAcceptance,
+  stagePhaseFromBranch,
   validateLoopDiff
 } from '../loop-engine.mjs';
 
@@ -57,4 +60,29 @@ test('hands an Issue state off exactly once and never polls it as a PR', () => {
   assert.equal(handedOff.prNumber, 73);
   assert.equal(isWatchableState(handedOff), false);
   assert.throws(() => handoffIssueState(handedOff, 0), /positive integer/);
+});
+
+test('recognizes stage branches and accepts evidence only for the latest SHA', () => {
+  assert.equal(stagePhaseFromBranch('feature/phase-3-media'), 3);
+  assert.equal(stagePhaseFromBranch('agent/loop-phase-6-agent-chat'), 6);
+  assert.equal(requiresStageAcceptance('feature/user-login'), false);
+
+  const state = createLoopState({
+    rootSha: 'a'.repeat(40),
+    kind: 'pr',
+    reference: '42',
+    branch: 'feature/phase-3-media'
+  });
+  state.latestSha = 'b'.repeat(40);
+  const evidence = {
+    phase: 3,
+    candidateSha: state.latestSha,
+    upgrade: 'success',
+    cleanInstall: 'success',
+    imageDigest: 'sha256:1234'
+  };
+  const accepted = applyStageEvidence(state, evidence, { databaseId: 9, url: 'https://example.test/run/9' });
+  assert.equal(accepted.stageRunId, 9);
+  assert.equal(accepted.cleanInstallResult, 'success');
+  assert.throws(() => applyStageEvidence(state, { ...evidence, candidateSha: 'c'.repeat(40) }, {}), /latest PR SHA/);
 });

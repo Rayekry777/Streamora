@@ -1,0 +1,132 @@
+name: 阶段晋升关联
+
+on:
+  pull_request:
+    branches: [master]
+    types: [closed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect-stage:
+    name: 识别阶段合并
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    outputs:
+      is_stage: ${{ steps.branch.outputs.is_stage }}
+      phase: ${{ steps.branch.outputs.phase }}
+    steps:
+      - id: branch
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          is_stage=false
+          phase=""
+          if [[ "$HEAD_BRANCH" =~ ^feature/phase-([0-9]+)-.+$ || "$HEAD_BRANCH" =~ ^agent/.+-phase-([0-9]+)-.+$ ]]; then
+            is_stage=true
+            phase="${BASH_REMATCH[1]}"
+          fi
+          echo "is_stage=$is_stage" >> "$GITHUB_OUTPUT"
+          echo "phase=$phase" >> "$GITHUB_OUTPUT"
+
+  verify-source-tree:
+    name: 校验候选与合并源码树
+    needs: detect-stage
+    if: needs.detect-stage.outputs.is_stage == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      master_sha: ${{ steps.record.outputs.master_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+      - name: 获取已验收候选证据并校验源码树
+        id: record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MASTER_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PHASE: ${{ needs.detect-stage.outputs.phase }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "refs/pull/$PR_NUMBER/head:refs/remotes/pull/$PR_NUMBER/head"
+          if [[ "$(git rev-parse "refs/remotes/pull/$PR_NUMBER/head")" != "$HEAD_SHA" ]]; then
+            echo "The fetched PR head does not match the merged candidate SHA." >&2
+            exit 1
+          fi
+          candidate_tree="$(git rev-parse "$HEAD_SHA^{tree}")"
+          master_tree="$(git rev-parse "$MASTER_SHA^{tree}")"
+          if [[ "$candidate_tree" != "$master_tree" ]]; then
+            echo "The squash merge source tree differs from the accepted candidate." >&2
+            exit 1
+          fi
+          run_id="$(gh run list --workflow stage-acceptance.yml --commit "$HEAD_SHA" --event pull_request --status success --limit 20 --json databaseId --jq '.[0].databaseId // ""')"
+          run_url="$(gh run list --workflow stage-acceptance.yml --commit "$HEAD_SHA" --event pull_request --status success --limit 20 --json url --jq '.[0].url // ""')"
+          if [[ -z "$run_id" || -z "$run_url" ]]; then
+            echo "No successful stage acceptance run exists for the merged candidate." >&2
+            exit 1
+          fi
+          gh run download "$run_id" --name stage-evidence --dir accepted-evidence
+          evidence_file="$(find accepted-evidence -type f -name stage-acceptance.json -print -quit)"
+          if [[ -z "$evidence_file" ]]; then
+            echo "The accepted run did not contain stage-acceptance.json." >&2
+            exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            const [source, destination, head, master, tree, phase, runUrl] = process.argv.slice(1);
+            const evidence = JSON.parse(fs.readFileSync(source, "utf8"));
+            if (evidence.candidateSha !== head || Number(evidence.phase) !== Number(phase) || evidence.upgrade !== "success" || evidence.cleanInstall !== "success") {
+              throw new Error("Stage evidence does not match the merged candidate.");
+            }
+            fs.writeFileSync(destination, JSON.stringify({ ...evidence, masterSha: master, sourceTree: tree, acceptanceRunUrl: runUrl, promotedAt: new Date().toISOString() }) + "\n");
+          ' "$evidence_file" stage-promotion-record.json "$HEAD_SHA" "$MASTER_SHA" "$master_tree" "$PHASE" "$run_url"
+          echo "master_sha=$MASTER_SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-promotion-record
+          path: stage-promotion-record.json
+          if-no-files-found: error
+          retention-days: 30
+
+  associate-master:
+    name: 登记健康 master 版本
+    needs: verify-source-tree
+    runs-on: [self-hosted, linux, x64, streamora-core]
+    environment: stage-vm
+    concurrency:
+      group: stage-vm
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: stage-promotion-record
+      - name: 关联验收候选与 master SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          state_dir="${HOME}/.local/state/streamora"
+          install -d -m 700 "$state_dir"
+          install -m 600 stage-promotion-record.json "$state_dir/promoted-master.json"
+          STATE_DIR="$state_dir" node -e '
+            const fs = require("fs");
+            const statePath = `${process.env.STATE_DIR}/last-healthy.json`;
+            const record = JSON.parse(fs.readFileSync("stage-promotion-record.json", "utf8"));
+            if (fs.existsSync(statePath)) {
+              const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+              if (state.sha === record.candidateSha) {
+                state.sourceSha = record.masterSha;
+                state.masterSha = record.masterSha;
+                fs.writeFileSync(statePath, JSON.stringify(state) + "\n", { mode: 0o600 });
+              }
+            }
+          '
+          echo "Accepted candidate associated with master ${{ needs.verify-source-tree.outputs.master_sha }}."

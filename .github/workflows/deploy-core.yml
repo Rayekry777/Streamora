@@ -1,9 +1,6 @@
 name: 部署 Core
 
 on:
-  workflow_run:
-    workflows: [验证]
-    types: [completed]
   workflow_dispatch:
     inputs:
       ref:
@@ -16,23 +13,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: streamora-core-deploy
+  group: stage-vm
   cancel-in-progress: false
 
 jobs:
   deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'master')
     runs-on: [self-hosted, linux, x64, streamora-core]
     timeout-minutes: 75
     steps:
       - name: 检出已验证提交
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
           persist-credentials: false
 

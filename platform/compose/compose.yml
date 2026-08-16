@@ -1,4 +1,4 @@
-name: streamora
+name: ${STREAMORA_COMPOSE_PROJECT:-streamora}
 
 x-infra-profiles: &infra-profiles
   - infra
@@ -575,9 +575,9 @@ services:
 
 networks:
   streamora-app:
-    name: streamora-app
+    name: ${STREAMORA_COMPOSE_PROJECT:-streamora}-app
   streamora-data:
-    name: streamora-data
+    name: ${STREAMORA_COMPOSE_PROJECT:-streamora}-data
     internal: true
 
 volumes:
