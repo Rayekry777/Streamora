@@ -1,21 +1,22 @@
 # 本机工具定位
 
-在 `D:\JavaPro\bilibili\Streamora` 的 Windows 开发环境中，直接使用以下命令，不再探测可执行文件位置：
+在 `D:\JavaPro\bilibili\Streamora` 的 Windows 开发环境中，先加载 `scripts\ops\Initialize-StreamoraToolchain.ps1`。本机自动化只从 `D:\aitool` 使用工具，不再探测或调用旧目录。
 
 | 用途 | 固定调用方式 | 说明 |
 | --- | --- | --- |
-| GitHub CLI | `C:\Users\32889\AppData\Local\Programs\GitHub CLI\bin\gh.exe` | 用于 PR、Actions、Issue 和远端状态查询。 |
-| pnpm | `C:\Users\32889\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd` | 用于前端、OpenAPI 和治理命令。 |
+| GitHub CLI | `D:\aitool\gh\bin\gh.exe` | 用于 PR、Actions、Issue 和远端状态查询。 |
+| Node / pnpm | `D:\aitool\node\node.exe` / `D:\aitool\node\pnpm.cmd` | pnpm 由 Node Corepack 固定为 `11.19.0`，缓存位于 `D:\aitool\pnpm`。 |
 | Maven | `.\mvnw.cmd` | 必须优先使用仓库 Maven Wrapper，保证与 CI 一致。 |
-| Maven 后备 | `D:\Maven\apache-maven-3.9.11-bin\apache-maven-3.9.11\bin\mvn.cmd` | 仅在 Wrapper 不可用时使用。 |
+| Maven 后备 | `D:\aitool\maven\bin\mvn.cmd` | 仅在 Wrapper 不可用时使用；依赖与 Wrapper 缓存位于 `D:\aitool\maven-cache`。 |
 
 ## 固定验证命令
 
 ```powershell
-& 'C:\Users\32889\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd' typecheck
-& 'C:\Users\32889\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd' lint
-& 'C:\Users\32889\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd' test
-& 'C:\Users\32889\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd' build
+. .\scripts\ops\Initialize-StreamoraToolchain.ps1
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
 .\mvnw.cmd -B -ntp verify
 ```
 

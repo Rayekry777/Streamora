@@ -18,10 +18,10 @@ description: 管理 Streamora 的自动 Git 提交、首次推送门禁、PR 创
 
 ## 远端循环
 
-- PR 验证失败时，在原 PR 分支执行至多三轮最小修复。每轮必须是“修改、验证、提交、推送、重新验证”。
-- 前三轮失败由 DeepSeek 受限补丁代理执行；第三轮仍失败后启动独立 Codex 根因子 Agent。Codex 在隔离 Runner 工作树实际修改受限源码，外层编排只对边界校验后的实际改动创建第四次提交并推送原 PR 分支。
-- 第四轮无法通过，或碰到禁止范围时，停止写入，设置 `agent:blocked` 并创建含 Artifact 链接的 Issue。
-- PR 的最新提交通过全部必需检查后自动 squash 合并。部署修复使用独立 `deploy-repair/*` 分支；普通 CI 修复回推原 PR 分支。
+- GitHub Actions 只运行验证、部署、浏览器联调、回滚与脱敏诊断；不在 GitHub 内调用模型或写入修复。
+- 本机 `Start-StreamoraLoop.ps1` 读取最新 Artifact，在 `D:\aitool\loop-state` 隔离副本中用已认证 Codex CLI 修复。首次失败立即开始，每轮必须是“修改、边界验证、本地验证、提交、推送、重新验证”。
+- 同一根提交最多三次本机修复；无安全补丁、验证失败或第三次仍失败时，停止写入并创建 `agent:blocked` Issue。
+- PR 的最新提交通过全部必需检查后由本机守护启用 squash 自动合并。部署修复使用独立 `deploy-repair/*` 分支；普通 CI 修复回推原 PR 分支。
 
 ## 不可突破的边界
 
