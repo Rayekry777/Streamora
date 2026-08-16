@@ -23,3 +23,12 @@ test('allows examples and separately scoped frontend and backend commits', () =>
   });
   assert.deepEqual(errors, []);
 });
+
+test('allows dangerous command fixtures inside governance test sources', () => {
+  const errors = validatePrGovernance({
+    files: ['scripts/ci/tests/pr-governance.test.mjs'],
+    diff: "+++ b/scripts/ci/tests/pr-governance.test.mjs\n+const fixture = 'docker compose down -v';\n",
+    commits: [{ sha: 'test', files: ['scripts/ci/tests/pr-governance.test.mjs'] }]
+  });
+  assert.deepEqual(errors, []);
+});

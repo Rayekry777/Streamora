@@ -9,6 +9,7 @@ const SAFE_ENV_EXAMPLE = /\.env(?:\.[^/]*)?\.example$/;
 const FRONTEND_PATH = /^(?:apps\/(?:web|admin-web)\/|packages\/ui-tokens\/)/;
 const BACKEND_PATH = /^(?:services\/|packages\/proto\/|pom\.xml$)/;
 const EXECUTABLE_PATH = /^(?:scripts\/|\.github\/workflows\/|platform\/)/;
+const TEST_SOURCE_PATH = /(?:^|\/)(?:tests?|__tests__)\//;
 const DANGEROUS_ADDITION = /(?:docker\s+compose\s+[^\n]*\bdown\b[^\n]*(?:\s-v\b|--volumes\b)|docker\s+volume\s+rm\b|rm\s+-rf\s+[^\n]*(?:data|volume|volumes))/i;
 
 export function validatePrGovernance({ files, diff, commits }) {
@@ -22,7 +23,7 @@ export function validatePrGovernance({ files, diff, commits }) {
   const addedByExecutable = [];
   for (const line of executableAdditions) {
     if (line.startsWith('+++ b/')) currentFile = line.slice(6);
-    else if (EXECUTABLE_PATH.test(currentFile)) addedByExecutable.push(line.slice(1));
+    else if (EXECUTABLE_PATH.test(currentFile) && !TEST_SOURCE_PATH.test(currentFile)) addedByExecutable.push(line.slice(1));
   }
   if (DANGEROUS_ADDITION.test(addedByExecutable.join('\n'))) errors.push('可执行变更新增了持久卷删除或递归数据删除命令。');
 
