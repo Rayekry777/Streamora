@@ -12,6 +12,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$script:LoopWatchMode = $PSCmdlet.ParameterSetName -eq 'Watch'
 
 . "$PSScriptRoot\Initialize-StreamoraToolchain.ps1" -RequireCodex | Out-Null
 
@@ -518,6 +519,14 @@ function Get-WatchedStates {
   return @(Get-ChildItem -LiteralPath $taskDirectory -Filter '*.json' | ForEach-Object { Get-Content -Raw $_.FullName | ConvertFrom-Json } | Where-Object { $_.kind -ne 'issue' -and $_.phase -notin @('completed', 'blocked', 'handed-off') })
 }
 
+function Test-RequestedTaskTerminal {
+  param([object[]]$CurrentStates)
+  if ($script:LoopWatchMode) {
+    return $false
+  }
+  return @($CurrentStates | Where-Object { $_.phase -notin @('completed', 'blocked', 'handed-off') }).Count -eq 0
+}
+
 if (-not $mutex.WaitOne(0)) {
   throw '另一个 Streamora Loop 守护正在运行。'
 }
@@ -541,7 +550,7 @@ try {
         Monitor-Pr $state
       }
     }
-    if ($Once) { break }
+    if ($Once -or (Test-RequestedTaskTerminal $states)) { break }
     Start-Sleep -Seconds $PollSeconds
     $states = Get-WatchedStates
   } while ($true)
