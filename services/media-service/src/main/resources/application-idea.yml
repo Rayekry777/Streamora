@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${STREAMORA_DEV_INFRA_HOST}:5432/streamora?currentSchema=media
+    username: streamora_media
+    password: ${SPRING_DATASOURCE_PASSWORD}

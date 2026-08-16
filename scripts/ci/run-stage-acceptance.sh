@@ -41,7 +41,6 @@ ensure_current_pr_sha() {
       get(`commits/${EXPECTED_SHA}/check-runs`)
     ]).then(([pull, comparison, checks]) => {
       if (pull.head.sha !== EXPECTED_SHA) throw new Error(`Stage candidate is stale: ${EXPECTED_SHA} != ${pull.head.sha}`);
-      if (!pull.labels.some((label) => label.name === "stage:ready")) throw new Error("Stage authorization was revoked before acceptance completed.");
       if (pull.base.ref !== "master" || comparison.behind_by !== 0) throw new Error("Stage candidate is no longer based on the latest master.");
       const gate = checks.check_runs.find((check) => check.name === "功能验证门禁" && check.head_sha === EXPECTED_SHA);
       if (!gate || gate.status !== "completed" || gate.conclusion !== "success") throw new Error("Functional verification is no longer successful for the stage candidate.");

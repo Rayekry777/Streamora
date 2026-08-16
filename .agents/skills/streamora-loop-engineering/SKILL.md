@@ -1,34 +1,31 @@
 ---
 name: streamora-loop-engineering
-description: 管理 Streamora 的自动 Git 提交、首次推送门禁、PR 创建和自动合并、GitHub 验证、CI 或部署失败修复及根因子 Agent 循环。用于用户要求提交、推送、PR、合并、自动修复、部署修复、Issue 自动开发或 Loop Engineering 时。
+description: 管理 Streamora 的本地验证、用户授权后的 GitHub 查询、阶段验收、合并和部署结果汇报。用于用户要求提交、推送、PR、阶段验收、合并或部署时；不执行远端自动修复。
 ---
 
-# Streamora Loop Engineering
+# Streamora 交付控制
 
-将任务推进到可验证终态，而不是只生成一次改动。先读取 [远端循环](references/remote-loop.md)；本地提交规则读取 `../streamora-delivery-workflow/references/commit-loop-engineering.md`。
+本 Skill 以本地开发为主，GitHub 只承担独立校验和已部署环境验证。先读取本机工具定位与交付规则，再根据用户当前指令执行一个明确动作。
 
-## 本地循环
+## 本地流程
 
-1. 先读取 [本机工具定位](../streamora-delivery-workflow/references/local-tooling.md)，GitHub 操作直接使用固定 GitHub CLI 路径。
-2. `master` 只跟踪 `origin/master`：先执行 `git fetch origin --prune` 与 `git pull --ff-only`，禁止在 `master` 上开发、提交、merge 或 rebase。若已分叉，先归档或移出未合并工作再同步主线。
-3. 普通人工功能从同步后的主线创建 `feature/<领域>-<主题>`；阶段交付使用唯一的 `feature/phase-<N>-<主题>` Draft PR。本机自动任务使用 `agent/<loop-id>-<slug>`，自动阶段任务在名称中追加 `phase-<N>`，部署修复保留 `deploy-repair/*`。PR 只能以这三类来源分支合并到 `master`。
-4. 为任务生成 `Loop-Id`，按用户端、管理端、后端、契约或基础设施划分提交边界。
-5. 检查当前分支、工作区和活动任务。仅当分支非受保护、无无关改动且属于当前任务时复用；否则创建 `agent/<loop-id>-<slug>`。
-6. 实现后启动独立质量 Agent。质量 Agent 可在相同范围内修复并复验，但不得提交或推送。
-7. 通过门禁后自动创建中文 Conventional Commit，包含四个正文区块和 Loop Trailer。
-8. 对话任务在首次推送前请求用户确认；`agent:ready` 只授权实现，Issue 自动任务还必须由用户显式传入 `-AllowFirstPush` 才能首次推送。
+1. IDEA 运行当前 Java 服务和断点调试；Docker/Compose 只提供 dev VM 中间件。
+2. Codex 根据改动范围运行受影响 Maven 模块、前端包、Compose 和必要联调验证；用户也可以在 IDEA 手动运行单模块测试。
+3. 阶段本地验证完成后，Codex 可以创建中文 Conventional Commit，但不推送。
+4. 只有用户明确要求推送时才执行 `git push`；不要因本地验证通过自动创建 PR 或推送。
 
-## 远端循环
+## 远端流程
 
-- GitHub Actions 只运行验证、部署、浏览器联调、回滚与脱敏诊断；不在 GitHub 内调用模型或写入修复。
-- 功能 PR 先通过改动分类后的“功能验证门禁”；阶段分支还必须由写权限用户对当前 SHA 添加 `stage:ready`，通过串行的“阶段门禁”后才能自动合并。
-- 本机 `Start-StreamoraLoop.ps1` 读取最新 Artifact，在 `D:\aitool\loop-state` 隔离副本中用已认证 Codex CLI 修复。首次失败立即开始，每轮必须是“修改、边界验证、本地验证、提交、推送、重新验证”。
-- 同一根提交最多五次本机修复；无安全补丁、验证失败或第五次仍失败时，停止写入并创建 `agent:blocked` Issue。
-- PR 的最新提交通过全部必需检查后由本机守护启用 squash 自动合并。部署修复使用独立 `deploy-repair/*` 分支；普通 CI 修复回推原 PR 分支。
+- 用户告知已推送后，查询 PR 的“功能验证门禁”和阶段验收状态；不创建修复分支、不调用 Codex CLI 修复、不评论阻塞、不重试。
+- 阶段分支 `feature/phase-<N>-<主题>` 在功能验证成功、非 Draft、基于最新 `master` 时由 `workflow_run` 自动启动真实阶段验收。
+- 阶段验收失败立即报告失败运行、诊断 Artifact 和候选 SHA，等待用户本地修复并再次推送。
+- 阶段验收成功后，只有收到“合并并部署”指令，才使用当前 Head SHA 校验并执行 squash 合并。
+- 合并后的阶段晋升校验成功后，以实际 squash 的 `master` SHA 手动触发 `deploy-core.yml`，等待部署和已部署浏览器 E2E 结束后只报告结果。
+- 部署失败保留部署脚本的安全回滚和诊断，Codex 停止，不自动修改代码或再次部署。
 
 ## 不可突破的边界
 
-- 不直接写入 `master`、`main` 或其他受保护分支，不绕过状态检查。
-- 不读取、输出或修改密钥、Token、权限、工作流治理、数据库迁移、依赖锁、持久卷删除逻辑和安全策略。
-- 每次循环检查 `Loop-Id`、根提交、尝试次数与并发锁；不重复处理过期结果。
-- 验证失败不允许写成通过。外部凭据、Runner 或基础设施阻塞必须如实记录。
+- 不直接写入受保护分支，不绕过 GitHub 必需检查。
+- 不读取、输出或修改密钥、环境文件、数据库迁移、依赖锁、分支保护或持久卷删除逻辑。
+- 不使用 `D:\aitool\loop-state`，不维护长期状态机、隔离修复副本或自动修复次数。
+- 任何未运行或失败的检查都必须如实报告；不能把本地 IDEA 运行结果写成 GitHub 或部署通过。

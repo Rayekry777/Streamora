@@ -50,57 +50,6 @@ jobs:
             node scripts/ci/classify-changes.mjs --all --github-output "$GITHUB_OUTPUT"
           fi
 
-  loop-governance:
-    name: Loop 治理
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.19.0
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: 校验 PR 分支策略
-        env:
-          BASE_REF: ${{ github.base_ref }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-        run: node scripts/ci/validate-branch-policy.mjs "$BASE_REF" "$HEAD_BRANCH"
-      - name: 安装治理依赖
-        run: pnpm install --frozen-lockfile
-      - name: 运行治理与 Loop 单元测试
-        run: pnpm test:governance
-      - name: 校验 GitHub Actions 与 Shell
-        shell: bash
-        run: |
-          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.11/scripts/download-actionlint.bash) 1.7.11 .
-          shellcheck_path="$(command -v shellcheck)"
-          ./actionlint -color -shellcheck "$shellcheck_path"
-      - name: 校验提交与 PR 交付模板
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BASE_REF: ${{ github.base_ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin "$BASE_REF":"refs/remotes/origin/$BASE_REF"
-          base_sha="$(git merge-base "origin/$BASE_REF" HEAD)"
-          git diff --check "$base_sha" HEAD
-          node scripts/ci/validate-pr-governance.mjs "$base_sha" HEAD
-          gh pr view "$PR_NUMBER" --json body --jq .body > pr-body.md
-          metadata_args=(--from "$base_sha" --to HEAD --pr-body pr-body.md)
-          case "$HEAD_BRANCH" in
-            agent/*|deploy-repair/*) metadata_args+=(--require-loop-trailers) ;;
-          esac
-          pnpm git:metadata "${metadata_args[@]}"
-
   frontend:
     name: 前端与 OpenAPI
     needs: changes
@@ -131,17 +80,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p loop-diagnostics/frontend
-          printf 'workflow=%s\njob=%s\nsha=%s\n' "$GITHUB_WORKFLOW" "$GITHUB_JOB" "$GITHUB_SHA" > loop-diagnostics/frontend/context.txt
+          mkdir -p diagnostics/frontend
+          printf 'workflow=%s\njob=%s\nsha=%s\n' "$GITHUB_WORKFLOW" "$GITHUB_JOB" "$GITHUB_SHA" > diagnostics/frontend/context.txt
           for path in test-results playwright-report packages/web/test-results packages/admin-web/test-results; do
-            if [[ -e "$path" ]]; then cp -R "$path" loop-diagnostics/frontend/"$(basename "$path")"; fi
+            if [[ -e "$path" ]]; then cp -R "$path" diagnostics/frontend/"$(basename "$path")"; fi
           done
       - name: 上传前端诊断
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: verify-frontend-diagnostics
-          path: loop-diagnostics/frontend
+          path: diagnostics/frontend
           if-no-files-found: warn
           retention-days: 14
 
@@ -173,10 +122,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p loop-diagnostics/backend
-          printf 'workflow=%s\njob=%s\nsha=%s\n' "$GITHUB_WORKFLOW" "$GITHUB_JOB" "$GITHUB_SHA" > loop-diagnostics/backend/context.txt
+          mkdir -p diagnostics/backend
+          printf 'workflow=%s\njob=%s\nsha=%s\n' "$GITHUB_WORKFLOW" "$GITHUB_JOB" "$GITHUB_SHA" > diagnostics/backend/context.txt
           find . -type f \( -path '*/target/surefire-reports/*' -o -path '*/target/failsafe-reports/*' \) -print0 | while IFS= read -r -d '' file; do
-            destination="loop-diagnostics/backend/${file#./}"
+            destination="diagnostics/backend/${file#./}"
             mkdir -p "$(dirname "$destination")"
             cp "$file" "$destination"
           done
@@ -185,7 +134,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: verify-backend-diagnostics
-          path: loop-diagnostics/backend
+          path: diagnostics/backend
           if-no-files-found: warn
           retention-days: 14
 
@@ -204,15 +153,15 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          mkdir -p loop-diagnostics/docker
-          docker ps -a > loop-diagnostics/docker/containers.txt
-          docker images > loop-diagnostics/docker/images.txt
+          mkdir -p diagnostics/docker
+          docker ps -a > diagnostics/docker/containers.txt
+          docker images > diagnostics/docker/images.txt
       - name: 上传 Docker 诊断
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: verify-docker-diagnostics
-          path: loop-diagnostics/docker
+          path: diagnostics/docker
           if-no-files-found: warn
           retention-days: 14
 
@@ -233,13 +182,12 @@ jobs:
   verification-gate:
     name: 功能验证门禁
     if: always()
-    needs: [changes, loop-governance, frontend, backend, functional-docker, documentation]
+    needs: [changes, frontend, backend, functional-docker, documentation]
     runs-on: ubuntu-24.04
     steps:
       - name: 汇总必需检查
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          GOVERNANCE_RESULT: ${{ needs.loop-governance.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           DOCKER_RESULT: ${{ needs.functional-docker.result }}
@@ -247,7 +195,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for result in "$CHANGES_RESULT" "$GOVERNANCE_RESULT" "$FRONTEND_RESULT" "$BACKEND_RESULT" "$DOCKER_RESULT" "$DOCUMENTATION_RESULT"; do
+          for result in "$CHANGES_RESULT" "$FRONTEND_RESULT" "$BACKEND_RESULT" "$DOCKER_RESULT" "$DOCUMENTATION_RESULT"; do
             if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then
               echo "A required functional verification job ended with $result." >&2
               exit 1
