@@ -26,14 +26,14 @@ if [[ -n "$services_csv" ]]; then
   IFS=',' read -r -a changed_services <<< "$services_csv"
 fi
 
+# `docker compose up --wait` requires every explicit target to stay running or
+# healthy. One-shot init jobs are therefore left to their dependent services.
 infra_services=(
   postgres
-  postgres-privileges-init
   redis
   minio
   nacos
   rocketmq-namesrv
-  rocketmq-volume-init
   rocketmq-broker
 )
 
