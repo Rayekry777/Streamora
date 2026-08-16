@@ -29,6 +29,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
       - name: 查询当前 SHA 的授权证据
         id: evidence
         env:
@@ -64,9 +65,11 @@ jobs:
               done
             fi
           fi
-          echo "permission=$permission" >> "$GITHUB_OUTPUT"
-          echo "behind_by=$behind_by" >> "$GITHUB_OUTPUT"
-          echo "verified_sha=$verified_sha" >> "$GITHUB_OUTPUT"
+          {
+            echo "permission=$permission"
+            echo "behind_by=$behind_by"
+            echo "verified_sha=$verified_sha"
+          } >> "$GITHUB_OUTPUT"
       - name: 校验阶段策略
         id: policy
         continue-on-error: true

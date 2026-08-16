@@ -32,6 +32,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
       - name: 计算受影响范围
         id: classify
         shell: bash
@@ -225,6 +226,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
       - name: 校验本地文档链接
         run: node scripts/ci/check-doc-links.mjs
 
